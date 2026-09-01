@@ -5,7 +5,7 @@
 Le Code des assurances CIMA impose, pour la RC automobile, un tarif minimum
 approuvé État par État (art. 212) et un visa des tarifs par l'autorité de
 tutelle (art. 305). La réglementation évolue (le Conseil des ministres CIMA
-publie régulièrement des règlements modifiant le Code — par exemple des
+publie régulièrement des règlements modifiant le Code par exemple des
 règlements 2026). Ces règles ne doivent donc **jamais** être codées en dur
 dans le moteur actuariel : elles vivent dans `backend/app/regulatory/`,
 versionnées et remplaçables sans toucher au calcul de prime.
@@ -21,7 +21,7 @@ Ce n'est pas un raccourci technique paresseux : c'est le choix honnête compte
 tenu des données disponibles. Ce projet n'a **aucune donnée réelle** par pays
 qui permettrait de dire que le risque auto au Cameroun diffère de celui du
 Congo ou du Sénégal, ni dans quelle mesure. Inventer des coefficients de
-risque différents par pays donnerait une **fausse impression de précision** —
+risque différents par pays donnerait une **fausse impression de précision**
 pire qu'admettre franchement qu'un seul modèle démonstratif (calibré sur les
 hypothèses RCA, voir `docs/cahier_des_charges.md`) est utilisé partout en
 attendant des données réelles par marché.
@@ -53,7 +53,7 @@ Ce qui ne varie *pas* (encore) :
 **`minimum_premium` vaut `None` pour les 15 pays.** Aucun tarif minimum RC
 auto n'a été obtenu et validé auprès du régulateur CIMA dans le cadre de ce
 projet, pour aucun pays. Tant que cette valeur reste `None`, le contrôle
-réglementaire est toujours `compliant=True` avec un message explicite —
+réglementaire est toujours `compliant=True` avec un message explicite
 **aucune contrainte n'est simulée avec un chiffre inventé**. Présenter un tarif
 calculé uniquement sur données synthétiques comme un tarif officiellement
 conforme serait trompeur, quel que soit le pays.
