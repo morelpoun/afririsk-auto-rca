@@ -45,6 +45,9 @@
     padding-top: 1rem;
   }
   .placeholder { color: var(--muted); font-size: 0.9rem; }
+  .section-title { margin: 2rem 0 0; font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .card .value.warn { color: #f59e0b; }
+  .card .value.ok { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -59,12 +62,18 @@
     <div class="placeholder">Chargement…</div>
   </div>
 
+  <h2 class="section-title">Rentabilité (polices réellement souscrites)</h2>
+  <div class="cards" id="kpi-cards">
+    <div class="placeholder">Chargement…</div>
+  </div>
+
   <p class="note">
-    Ce portefeuille est simulé, pas issu de données réelles d'un assureur —
-    voir docs/cahier_des_charges.md. Les KPI de rentabilité (loss ratio,
-    combined ratio) nécessitent un historique de sinistres/primes réels et
-    seront ajoutés lorsque le module sinistres sera branché à une base de
-    contrats réels (v0.3).
+    Le premier bloc est calculé sur le portefeuille synthétique de
+    calibration. Le second est calculé sur les polices et sinistres
+    réellement persistés en base (voir <code>POST /policies</code>,
+    <code>POST /claims</code>) — vide tant qu'aucune police n'a été
+    souscrite. <code>python -m scripts.seed_database</code> permet de
+    peupler des données de démonstration.
   </p>
 </div>
 
@@ -85,6 +94,30 @@ fetch('/portfolio/metrics')
   })
   .catch(() => {
     document.getElementById('cards').innerHTML = '<div class="placeholder">Impossible de charger les métriques.</div>';
+  });
+
+const pct = (n) => n === null || n === undefined ? '—' : (n * 100).toFixed(1) + ' %';
+const ratioClass = (n) => n === null || n === undefined ? '' : (n <= 1 ? 'ok' : 'warn');
+
+fetch('/portfolio/kpis')
+  .then((res) => res.json())
+  .then((data) => {
+    if (!data.nombre_polices) {
+      document.getElementById('kpi-cards').innerHTML =
+        '<div class="placeholder">Aucune police souscrite pour l\'instant.</div>';
+      return;
+    }
+    document.getElementById('kpi-cards').innerHTML = `
+      <div class="card"><div class="label">Polices</div><div class="value">${fmt(data.nombre_polices)}</div></div>
+      <div class="card"><div class="label">Primes totales</div><div class="value">${fmt(data.primes_totales)} FCFA</div></div>
+      <div class="card"><div class="label">Sinistres totaux</div><div class="value">${fmt(data.sinistres_totaux)} FCFA</div></div>
+      <div class="card"><div class="label">Loss ratio</div><div class="value ${ratioClass(data.loss_ratio)}">${pct(data.loss_ratio)}</div></div>
+      <div class="card"><div class="label">Expense ratio</div><div class="value">${pct(data.expense_ratio)}</div></div>
+      <div class="card"><div class="label">Combined ratio</div><div class="value ${ratioClass(data.combined_ratio)}">${pct(data.combined_ratio)}</div></div>
+    `;
+  })
+  .catch(() => {
+    document.getElementById('kpi-cards').innerHTML = '<div class="placeholder">Impossible de charger les KPI.</div>';
   });
 </script>
 </body>

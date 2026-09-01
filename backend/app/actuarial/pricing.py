@@ -86,6 +86,7 @@ class PricingResult:
     marge_technique: float
     taxes: float
     prime_commerciale: float
+    coefficient_bonus_malus: float = 1.0
     frequence_contributions: dict[str, float] = field(default_factory=dict)
     severite_contributions: dict[str, float] = field(default_factory=dict)
     frequence_moyenne_portefeuille: float = 0.0
@@ -148,8 +149,9 @@ class ActuarialEngine:
 
         garantie = contract["garantie"]
         loading = GARANTIE_LOADING.get(garantie, 1.0)
+        coefficient_bonus_malus = float(contract.get("coefficient_bonus_malus", 1.0))
 
-        prime_pure = frequence * cout_moyen * loading
+        prime_pure = frequence * cout_moyen * loading * coefficient_bonus_malus
         prime_nette = prime_pure * (1 + MARGE_TECHNIQUE) + FRAIS_GESTION_FCFA
         prime_commerciale = prime_nette * (1 + TAUX_TAXE)
 
@@ -161,6 +163,7 @@ class ActuarialEngine:
             marge_technique=prime_pure * MARGE_TECHNIQUE,
             taxes=prime_commerciale - prime_nette,
             prime_commerciale=prime_commerciale,
+            coefficient_bonus_malus=coefficient_bonus_malus,
             frequence_contributions=freq_contrib,
             severite_contributions=sev_contrib,
             frequence_moyenne_portefeuille=freq_baseline,

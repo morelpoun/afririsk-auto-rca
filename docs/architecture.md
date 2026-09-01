@@ -12,12 +12,14 @@ backend/app/
   actuarial/           moteur de tarification
     data_simulation.py   portefeuille synthétique documenté
     pricing.py            GLM fréquence (Poisson) + sévérité (Gamma), décomposition
+    bonus_malus.py         grille de coefficient par défaut (non réglementaire)
   regulatory/          couche réglementaire configurable
     rules.py              modèle de règle + contrôle de tarif minimum
     countries/cf.py        paramètres RCA (CIMA)
   database/            persistance
     models.py             customers, vehicles, policies, claims, pricing_results
     session.py             SQLite (dev/tests) ou PostgreSQL (docker-compose)
+    crud.py                 opérations de souscription/sinistres/KPI
   ml/                  benchmarks (pas utilisés par /tarif en production)
     tweedie.py             GLM Tweedie
     xgboost_model.py        XGBoost (objectif Tweedie)
@@ -52,11 +54,10 @@ du dépôt) — zéro configuration pour développer ou lancer les tests.
 `docker-compose.yml` démarre un PostgreSQL réel et positionne `DATABASE_URL`
 en conséquence, pour un environnement proche de la production.
 
-Les tables `customers`, `vehicles`, `policies` et `claims` existent déjà dans
-le schéma (`database/models.py`) mais ne sont pas encore alimentées par un
-workflow de souscription complet — seul `pricing_results` est écrit à chaque
-cotation dans ce MVP. Le branchement d'un vrai parcours de souscription
-(création client → véhicule → police) est prévu en v0.2/v0.3.
+Depuis v0.3, `POST /policies` alimente réellement `customers`, `vehicles`,
+`policies` (et `pricing_results`, avec `policy_id` renseigné) ; `POST /claims`
+alimente `claims`. Voir `docs/claims.md` pour le détail du parcours de
+souscription, des sinistres et des KPI de rentabilité qui en découlent.
 
 ## Modèles benchmark (`ml/`, v0.2)
 
@@ -70,7 +71,6 @@ référence.
 
 ## Ce qui n'est pas encore là (volontairement)
 
-- Bonus-malus
 - Authentification / RBAC
 - Migrations de schéma (Alembic) — pour l'instant `Base.metadata.create_all()`
   au démarrage, suffisant tant que le schéma n'est pas encore stabilisé

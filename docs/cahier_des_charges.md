@@ -10,14 +10,16 @@ une prime commerciale, calculées par un moteur actuariel transparent et explica
 **Dans le périmètre :**
 - Une seule branche : assurance automobile particulière (hors flottes, hors taxis)
 - Un seul pays : République Centrafricaine (RCA)
-- Calcul de prime à la souscription (pas de gestion de sinistres, pas de provisionnement)
+- Calcul de prime à la souscription, souscription de polices, déclaration de
+  sinistres et KPI de rentabilité (loss/expense/combined ratio) — pas de
+  provisionnement actuariel des sinistres (IBNR, triangles)
 - Données simulées, calibrées sur des hypothèses de marché documentées et ajustables
 
 **Hors périmètre (phases suivantes) :**
 - Autres branches (santé, habitation, vie...)
 - Autres pays (l'architecture le permet — voir `docs/regulatory.md` — mais seule
   la RCA est configurée)
-- Bonus-malus, scoring fraude, MLflow (registre de modèles versionné)
+- Scoring fraude, provisionnement (IBNR), MLflow (registre de modèles versionné)
 - Authentification/RBAC
 - Frontend React/Next.js aboutissant (le MVP a une interface statique minimale,
   voir §7)
@@ -55,8 +57,9 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
 
 ## 7. Architecture technique (MVP actuel)
 - Backend : Python + FastAPI, structuré en sous-modules `actuarial/`
-  (fréquence/sévérité/prime), `regulatory/` (règles CIMA configurables par
-  pays) et `database/` (persistance)
+  (fréquence/sévérité/prime/bonus-malus), `regulatory/` (règles CIMA
+  configurables par pays), `database/` (persistance + CRUD polices/sinistres)
+  et `ml/` (benchmarks Tweedie/XGBoost, hors production — voir §6 v0.2)
 - Moteur actuariel : pandas, numpy, statsmodels (GLM Poisson / Gamma)
 - Persistance : PostgreSQL via `docker-compose` (SQLite en développement/tests
   sans configuration). Chaque tarification est tracée dans `pricing_results`
@@ -80,10 +83,14 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
    `docs/ml_methodology.md`) — le GLM fréquence×sévérité reste le modèle de
    production ; les alternatives sont des benchmarks, pas encore justifiées
    par un gain net sur données réelles
-7. ⬜ Bonus-malus, gestion des sinistres, KPI de rentabilité (loss/combined ratio)
+7. ✅ Bonus-malus, gestion des sinistres, KPI de rentabilité (v0.3, voir
+   `docs/claims.md`) — grille bonus-malus par défaut non validée CIMA,
+   souscription de polices (`POST /policies`), sinistres (`POST /claims`),
+   loss/expense/combined ratio (`GET /portfolio/kpis`)
 8. ⬜ Partenariat avec une compagnie RCA pour données réelles anonymisées et
    recalibration des modèles
 9. ⬜ Extension multi-branches / multi-pays (Cameroun, Gabon, ...)
+10. ⬜ Authentification/RBAC, frontend React/Next.js complet, facturation SaaS
 
 ## 9. Risques principaux
 - Sans données réelles, le modèle reste démonstratif — une mise en production

@@ -106,6 +106,93 @@ def test_models_endpoint_reports_production_model():
         assert "message" in data
 
 
+def test_bonus_malus_coefficient_reduces_premium():
+    with TestClient(app) as client:
+        neutral = client.post("/tarif", json=BASE_CONTRACT).json()
+        malussed_contract = dict(BASE_CONTRACT, coefficient_bonus_malus=1.25)
+        malussed = client.post("/tarif", json=malussed_contract).json()
+
+    assert malussed["coefficient_bonus_malus"] == 1.25
+    assert malussed["prime_commerciale"] > neutral["prime_commerciale"]
+
+
+def test_bonus_malus_compute_endpoint():
+    with TestClient(app) as client:
+        response = client.post("/bonus-malus/compute", json={"historique_sinistres": [0, 0, 1, 0]})
+    assert response.status_code == 200
+    data = response.json()
+    assert 0.5 <= data["coefficient"] <= 3.5
+    assert "avertissement" in data
+
+
+def test_policy_subscription_and_claim_flow():
+    payload = {
+        "customer": {
+            "first_name": "Jean",
+            "last_name": "Test",
+            "birth_date": "1990-05-10",
+            "gender": "M",
+            "city": "Bangui",
+        },
+        "vehicle": {
+            "brand": "Toyota",
+            "model": "Corolla",
+            "year": 2019,
+            "vehicle_type": "berline",
+            "power": 8,
+            "market_value": 7_000_000,
+            "usage": "particulier",
+        },
+        "contract": BASE_CONTRACT,
+        "start_date": "2026-01-01",
+        "end_date": "2026-12-31",
+    }
+    with TestClient(app) as client:
+        policy_response = client.post("/policies", json=payload)
+        assert policy_response.status_code == 200
+        policy = policy_response.json()
+        assert policy["premium"] > 0
+        assert policy["pricing_result_id"] is not None
+
+        listed = client.get("/policies").json()
+        assert any(p["id"] == policy["id"] for p in listed)
+
+        claim_response = client.post(
+            "/claims",
+            json={
+                "policy_id": policy["id"],
+                "claim_date": "2026-03-01",
+                "claim_type": "materiel",
+                "claim_amount": 150_000,
+            },
+        )
+        assert claim_response.status_code == 200
+        claim = claim_response.json()
+        assert claim["policy_id"] == policy["id"]
+
+        claims_for_policy = client.get(f"/claims?policy_id={policy['id']}").json()
+        assert len(claims_for_policy) == 1
+
+        kpis = client.get("/portfolio/kpis").json()
+        assert kpis["nombre_polices"] >= 1
+        assert kpis["sinistres_totaux"] >= 150_000
+        assert kpis["loss_ratio"] is not None
+
+
+def test_claim_on_unknown_policy_returns_404():
+    with TestClient(app) as client:
+        response = client.post(
+            "/claims",
+            json={
+                "policy_id": 999_999,
+                "claim_date": "2026-03-01",
+                "claim_type": "materiel",
+                "claim_amount": 100_000,
+            },
+        )
+    assert response.status_code == 404
+
+
 def test_simulate_endpoint_returns_one_point_per_value():
     payload = {
         "contrat_base": BASE_CONTRACT,

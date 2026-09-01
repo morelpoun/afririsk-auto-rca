@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -7,6 +8,7 @@ from pydantic import BaseModel, Field
 Usage = Literal["particulier", "professionnel"]
 Zone = Literal["bangui", "province"]
 Garantie = Literal["tiers_simple", "tiers_etendu", "tous_risques"]
+Gender = Literal["M", "F"]
 
 
 class ContractInput(BaseModel):
@@ -18,6 +20,9 @@ class ContractInput(BaseModel):
     valeur_vehicule_fcfa: float = Field(..., gt=0, description="Valeur assurée du véhicule (FCFA)")
     garantie: Garantie = "tiers_simple"
     nb_sinistres_anterieurs: int = Field(0, ge=0, le=20)
+    coefficient_bonus_malus: float = Field(
+        1.0, ge=0.5, le=3.5, description="Coefficient bonus-malus déjà calculé (voir POST /bonus-malus/compute)"
+    )
 
 
 class RegulatoryCheck(BaseModel):
@@ -34,6 +39,7 @@ class PricingResponse(BaseModel):
     marge_technique: float
     taxes: float
     prime_commerciale: float
+    coefficient_bonus_malus: float
     frequence_contributions: dict[str, float]
     severite_contributions: dict[str, float]
     frequence_moyenne_portefeuille: float
@@ -72,3 +78,94 @@ class PortfolioMetrics(BaseModel):
     prime_pure_moyenne: float
     exposition_totale: float
     nombre_sinistres: int
+
+
+class PortfolioKPIs(BaseModel):
+    nombre_polices: int
+    primes_totales: float
+    sinistres_totaux: float
+    frais_totaux: float
+    loss_ratio: float | None
+    expense_ratio: float | None
+    combined_ratio: float | None
+
+
+class BonusMalusRequest(BaseModel):
+    historique_sinistres: list[int] = Field(
+        ..., min_length=1, max_length=30, description="Sinistres responsables par année, du plus ancien au plus récent"
+    )
+
+
+class BonusMalusResponse(BaseModel):
+    coefficient: float
+    classe_indicative: int
+    avertissement: str
+
+
+class CustomerInput(BaseModel):
+    first_name: str
+    last_name: str
+    birth_date: date
+    gender: Gender
+    profession: str | None = None
+    city: str | None = None
+    country: str = "CF"
+
+
+class VehicleInput(BaseModel):
+    registration_number: str | None = None
+    brand: str | None = None
+    model: str | None = None
+    year: int = Field(..., ge=1970, le=2100)
+    vehicle_type: str
+    power: int = Field(..., ge=1, le=60)
+    market_value: float = Field(..., gt=0)
+    usage: Usage = "particulier"
+
+
+class PolicySubscriptionRequest(BaseModel):
+    customer: CustomerInput
+    vehicle: VehicleInput
+    contract: ContractInput
+    start_date: date
+    end_date: date
+
+
+class PolicyResponse(BaseModel):
+    id: int
+    customer_id: int
+    vehicle_id: int
+    product: str
+    start_date: date
+    end_date: date
+    coverage: str
+    deductible: float
+    premium: float
+    status: str
+    pricing_result_id: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ClaimInput(BaseModel):
+    policy_id: int
+    claim_date: date
+    claim_type: str
+    claim_amount: float = Field(..., ge=0)
+    paid_amount: float = Field(0.0, ge=0)
+    reserved_amount: float = Field(0.0, ge=0)
+    responsibility: float | None = Field(None, ge=0, le=1)
+
+
+class ClaimResponse(BaseModel):
+    id: int
+    policy_id: int
+    claim_date: date
+    claim_type: str
+    claim_amount: float
+    paid_amount: float
+    reserved_amount: float
+    responsibility: float | None
+    status: str
+
+    model_config = {"from_attributes": True}

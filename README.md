@@ -10,9 +10,10 @@ cotation.
 
 Voir [`docs/cahier_des_charges.md`](docs/cahier_des_charges.md) (périmètre,
 hypothèses, feuille de route), [`docs/architecture.md`](docs/architecture.md),
-[`docs/regulatory.md`](docs/regulatory.md) (couche réglementaire CIMA) et
+[`docs/regulatory.md`](docs/regulatory.md) (couche réglementaire CIMA),
 [`docs/ml_methodology.md`](docs/ml_methodology.md) (comparaison GLM / Tweedie
-/ XGBoost+SHAP).
+/ XGBoost+SHAP) et [`docs/claims.md`](docs/claims.md) (souscription, sinistres,
+bonus-malus, KPI de rentabilité).
 
 ## Démarrage rapide avec Docker (recommandé)
 
@@ -71,6 +72,22 @@ voir `docs/regulatory.md`), et l'identifiant de la cotation persistée.
 et renvoie la prime commerciale à chaque point (courbe de sensibilité).
 `GET /portfolio/metrics` renvoie les KPI agrégés du portefeuille synthétique.
 
+## Souscription, sinistres et bonus-malus
+
+`POST /policies` souscrit une police (client + véhicule + contrat tarifé) ;
+`POST /claims` déclare un sinistre ; `GET /portfolio/kpis` calcule loss ratio,
+expense ratio et combined ratio sur les données réellement persistées.
+`POST /bonus-malus/compute` calcule un coefficient à partir d'un historique de
+sinistres (grille par défaut, **non validée CIMA** — voir `docs/claims.md`).
+
+```bash
+cd backend && python -m scripts.seed_database --n 500
+```
+
+Peuple la base avec des polices/sinistres synthétiques réalistes pour donner
+du contenu au dashboard et à `/portfolio/kpis` sans attendre de vraies
+données compagnie.
+
 ## Inspecter la calibration des modèles
 
 ```bash
@@ -109,7 +126,8 @@ cd backend && python -m pytest
 - ✅ Couche réglementaire configurable (CIMA/RCA)
 - ✅ Interface de tarification et dashboard minimalistes
 - ✅ Benchmarks Tweedie / XGBoost + SHAP comparés au GLM de production (v0.2)
-- ⬜ Bonus-malus, gestion des sinistres, KPI de rentabilité
+- ✅ Bonus-malus, souscription/sinistres, KPI de rentabilité réels (v0.3)
+- ⬜ Authentification/RBAC, frontend React/Next.js complet, facturation SaaS
 - ⬜ Calibration sur données réelles d'une compagnie RCA
 - ⬜ Extension multi-branches / multi-pays
 
