@@ -11,6 +11,7 @@ FEATURES = [
     "age_conducteur",
     "anciennete_permis",
     "usage_pro",
+    "usage_taxi_moto",
     "zone_urbain",
     "puissance_cv",
     "valeur_vehicule_fcfa",

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-01T13:23:49.427705+00:00",
+  "generated_at": "2026-09-01T13:41:59.823746+00:00",
   "portfolio_size": 15000,
   "train_size": 10500,
   "test_size": 4500,
@@ -10,9 +10,9 @@
       "status": "production",
       "interpretable": true,
       "metrics": {
-        "rmse": 216128.3715429818,
-        "mae": 107784.09072726523,
-        "gini": 0.24480958846972004
+        "rmse": 257901.28056175535,
+        "mae": 122051.69689221875,
+        "gini": 0.30981366156284695
       }
     },
     {
@@ -21,9 +21,9 @@
       "status": "benchmark",
       "interpretable": true,
       "metrics": {
-        "rmse": 216263.03439897983,
-        "mae": 108380.35685357792,
-        "gini": 0.22977981623083502
+        "rmse": 258554.90160018072,
+        "mae": 122308.42733457223,
+        "gini": 0.2857791976870902
       }
     },
     {
@@ -32,18 +32,19 @@
       "status": "benchmark",
       "interpretable": false,
       "metrics": {
-        "rmse": 217340.8373491936,
-        "mae": 103050.91643444137,
-        "gini": 0.2313294395773835
+        "rmse": 260738.48001780134,
+        "mae": 117641.30596855118,
+        "gini": 0.21935682937012288
       },
       "shap_global_importance": {
-        "age_conducteur": 0.14857131242752075,
-        "anciennete_permis": 0.19124479591846466,
-        "usage_pro": 0.07605759799480438,
-        "zone_urbain": 0.2217557430267334,
-        "puissance_cv": 0.1284635215997696,
-        "valeur_vehicule_fcfa": 0.21762031316757202,
-        "nb_sinistres_anterieurs": 0.11423336714506149
+        "age_conducteur": 0.132025808095932,
+        "anciennete_permis": 0.3192921280860901,
+        "usage_pro": 0.012732656672596931,
+        "usage_taxi_moto": 0.14846788346767426,
+        "zone_urbain": 0.20205022394657135,
+        "puissance_cv": 0.10058646649122238,
+        "valeur_vehicule_fcfa": 0.20214352011680603,
+        "nb_sinistres_anterieurs": 0.06897474825382233
       }
     }
   ]

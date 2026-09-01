@@ -1,5 +1,5 @@
 """Table des États membres de la CIMA et enregistrement de leurs règles
-réglementaires RC automobile.
+réglementaires, par produit (auto RC, habitation MRH — voir `PRODUCTS`).
 
 Choix de conception important : ce projet n'a **aucune donnée réelle** par
 pays permettant de différencier statistiquement le risque auto entre le
@@ -69,6 +69,8 @@ CIMA_COUNTRIES: list[CimaCountry] = [
 _BY_CODE = {c.code: c for c in CIMA_COUNTRIES}
 
 PRODUCT_AUTO_RC = "AUTO_RC"
+PRODUCT_HABITATION_MRH = "HABITATION_MRH"
+PRODUCTS = [PRODUCT_AUTO_RC, PRODUCT_HABITATION_MRH]
 REGULATORY_VERSION = "CIMA-code-provisoire"  # aucune règle n'a encore été validée pays par pays
 
 
@@ -81,21 +83,23 @@ def currency_for_country(code: CimaCountryCode | str) -> str:
 
 
 def load_all_regulatory_rules() -> None:
-    """Enregistre une règle RC auto par pays membre, sans tarif minimum
-    (voir l'avertissement du module `regulatory.rules` : `minimum_premium`
-    reste `None` tant qu'aucune valeur n'a été obtenue et validée).
+    """Enregistre une règle par (pays, produit) pour tous les pays membres et
+    tous les produits supportés (`PRODUCTS`), sans tarif minimum (voir
+    l'avertissement du module `regulatory.rules` : `minimum_premium` reste
+    `None` tant qu'aucune valeur n'a été obtenue et validée).
     """
     for country in CIMA_COUNTRIES:
-        register_rule(
-            RegulatoryRule(
-                country=country.code.value,
-                currency=country.currency,
-                regulator="CIMA",
-                product=PRODUCT_AUTO_RC,
-                regulatory_version=REGULATORY_VERSION,
-                effective_from=date(2024, 1, 1),
-                effective_to=None,
-                approval_required=True,
-                minimum_premium=None,
+        for product in PRODUCTS:
+            register_rule(
+                RegulatoryRule(
+                    country=country.code.value,
+                    currency=country.currency,
+                    regulator="CIMA",
+                    product=product,
+                    regulatory_version=REGULATORY_VERSION,
+                    effective_from=date(2024, 1, 1),
+                    effective_to=None,
+                    approval_required=True,
+                    minimum_premium=None,
+                )
             )
-        )

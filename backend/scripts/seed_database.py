@@ -28,6 +28,11 @@ VEHICLES = [
     ("Hyundai", "Tucson", "suv"),
     ("Kia", "Rio", "berline"),
 ]
+MOTOS = [
+    ("Sanili", "SL125", "moto"),
+    ("Haojue", "HJ125", "moto"),
+    ("Bajaj", "Boxer", "moto"),
+]
 CLAIM_TYPES = ["materiel", "corporel", "vol"]
 
 MODEL_VERSION = "GLM_FREQ_SEV_V1"
@@ -74,13 +79,13 @@ def seed(n: int, seed_value: int = 123) -> None:
                     "last_name": "Démo",
                     "birth_date": birth_date,
                     "gender": row["sexe"],
-                    "profession": "professionnel" if row["usage"] == "professionnel" else None,
+                    "profession": row["usage"] if row["usage"] != "particulier" else None,
                     "city": "Capitale" if row["zone"] == "urbain" else "Province",
                     "country": COUNTRY,
                 },
             )
 
-            brand, model, vehicle_type = rng.choice(VEHICLES)
+            brand, model, vehicle_type = rng.choice(MOTOS if row["usage"] == "taxi_moto" else VEHICLES)
             vehicle = crud.create_vehicle(
                 db,
                 customer.id,

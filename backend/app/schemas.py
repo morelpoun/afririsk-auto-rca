@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.regulatory.cima_countries import CimaCountryCode
 
-Usage = Literal["particulier", "professionnel"]
+Usage = Literal["particulier", "professionnel", "taxi_moto"]
 Zone = Literal["urbain", "rural"]
 Garantie = Literal["tiers_simple", "tiers_etendu", "tous_risques"]
 Gender = Literal["M", "F"]
@@ -193,3 +193,66 @@ class ClaimResponse(BaseModel):
     status: str
 
     model_config = {"from_attributes": True}
+
+
+# --- Habitation (multirisque habitation / MRH) ------------------------------
+# Branche indépendante de l'auto : moteur actuariel séparé
+# (actuarial/habitation_pricing.py), même principes (GLM fréquence/sévérité,
+# décomposition explicative, chargements). Pas encore de souscription de
+# police ni de sinistres pour cette branche (v0.5 = moteur de tarification
+# seulement) — voir docs/habitation.md.
+
+TypeLogement = Literal["maison", "appartement"]
+MateriauxConstruction = Literal["dur", "semi_dur", "precaire"]
+GarantieHabitation = Literal["incendie_simple", "multirisque"]
+
+
+class HabitationContractInput(BaseModel):
+    country: CimaCountryCode = Field(CimaCountryCode.CF, description="Pays CIMA du contrat")
+    type_logement: TypeLogement = "maison"
+    zone: Zone = Field("urbain", description="Zone de la capitale/grande ville, ou zone rurale")
+    surface_m2: float = Field(..., gt=0, le=2000, description="Surface habitable (m²)")
+    materiaux_construction: MateriauxConstruction = Field(
+        "dur", description="dur (béton/parpaings), semi_dur, ou précaire"
+    )
+    valeur_batiment: float = Field(..., gt=0, description="Valeur assurée du bâtiment (devise du pays)")
+    valeur_contenu: float = Field(..., ge=0, description="Valeur assurée du contenu (devise du pays)")
+    anciennete_batiment: int = Field(..., ge=0, le=200, description="Âge du bâtiment en années")
+    securite: bool = Field(False, description="Gardiennage ou alarme en place")
+    nb_sinistres_anterieurs: int = Field(0, ge=0, le=20)
+    garantie: GarantieHabitation = "incendie_simple"
+
+
+class HabitationPricingResponse(BaseModel):
+    frequence_estimee: float
+    cout_moyen_estime: float
+    prime_pure: float
+    frais_gestion: float
+    marge_technique: float
+    taxes: float
+    prime_commerciale: float
+    frequence_contributions: dict[str, float]
+    severite_contributions: dict[str, float]
+    frequence_moyenne_portefeuille: float
+    cout_moyen_portefeuille: float
+    model_version: str
+    currency: str
+    regulatory_check: RegulatoryCheck
+    pricing_result_id: int | None = None
+
+
+class HabitationSimulationRequest(BaseModel):
+    contrat_base: HabitationContractInput
+    parametre: Literal[
+        "surface_m2",
+        "valeur_batiment",
+        "valeur_contenu",
+        "anciennete_batiment",
+        "nb_sinistres_anterieurs",
+    ]
+    valeurs: list[float] = Field(..., min_length=1, max_length=50)
+
+
+class HabitationSimulationResponse(BaseModel):
+    parametre: str
+    points: list[SimulationPoint]

@@ -7,7 +7,6 @@ seule la couche réglementaire varie par pays, pas ce moteur.
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -15,11 +14,15 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
+from app.actuarial.glm_utils import decompose
+
 FREQUENCY_FORMULA = (
-    "nb_sinistres ~ jeune + usage_pro + zone_urbain "
+    "nb_sinistres ~ jeune + usage_pro + usage_taxi_moto + zone_urbain "
     "+ nb_sinistres_anterieurs + anciennete_plafonnee"
 )
-SEVERITY_FORMULA = "cout_moyen_sinistre ~ valeur_vehicule_fcfa + zone_urbain + puissance_cv"
+SEVERITY_FORMULA = (
+    "cout_moyen_sinistre ~ valeur_vehicule_fcfa + zone_urbain + puissance_cv + usage_taxi_moto"
+)
 
 # Chargements commerciaux — hypothèses de démonstration, à valider selon la
 # réglementation CIMA et la politique tarifaire de la compagnie. Montant fixe
@@ -47,42 +50,10 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["jeune"] = (df["age_conducteur"] < 25).astype(float)
     df["usage_pro"] = (df["usage"] == "professionnel").astype(float)
+    df["usage_taxi_moto"] = (df["usage"] == "taxi_moto").astype(float)
     df["zone_urbain"] = (df["zone"] == "urbain").astype(float)
     df["anciennete_plafonnee"] = df["anciennete_permis"].clip(upper=20).astype(float)
     return df
-
-
-def _linear_predictor(params: pd.Series, x: dict[str, float]) -> float:
-    lp = params.get("Intercept", 0.0)
-    for name, coef in params.items():
-        if name == "Intercept":
-            continue
-        lp += coef * x.get(name, 0.0)
-    return lp
-
-
-def _decompose(params: pd.Series, means: dict[str, float], x: dict[str, float]):
-    """Décompose exp(linear_predictor) en (valeur moyenne du portefeuille)
-    x (produit de facteurs multiplicatifs par variable), pour expliquer
-    pourquoi une prédiction s'écarte de la moyenne du portefeuille.
-    """
-    baseline_lp = params.get("Intercept", 0.0)
-    for name, coef in params.items():
-        if name == "Intercept":
-            continue
-        baseline_lp += coef * means.get(name, 0.0)
-    baseline = math.exp(baseline_lp)
-
-    contributions = {}
-    for name, coef in params.items():
-        if name == "Intercept":
-            continue
-        contributions[name] = math.exp(coef * (x.get(name, 0.0) - means.get(name, 0.0)))
-
-    prediction = baseline
-    for factor in contributions.values():
-        prediction *= factor
-    return prediction, baseline, contributions
 
 
 @dataclass
@@ -119,7 +90,14 @@ class ActuarialEngine:
             family=sm.families.Poisson(),
             offset=np.log(df["exposition"]),
         ).fit()
-        freq_vars = ["jeune", "usage_pro", "zone_urbain", "nb_sinistres_anterieurs", "anciennete_plafonnee"]
+        freq_vars = [
+            "jeune",
+            "usage_pro",
+            "usage_taxi_moto",
+            "zone_urbain",
+            "nb_sinistres_anterieurs",
+            "anciennete_plafonnee",
+        ]
         self.freq_means = {v: float(df[v].mean()) for v in freq_vars}
 
         sev_df = df[df["nb_sinistres"] > 0]
@@ -128,7 +106,7 @@ class ActuarialEngine:
             data=sev_df,
             family=sm.families.Gamma(link=sm.families.links.Log()),
         ).fit()
-        sev_vars = ["valeur_vehicule_fcfa", "zone_urbain", "puissance_cv"]
+        sev_vars = ["valeur_vehicule_fcfa", "zone_urbain", "puissance_cv", "usage_taxi_moto"]
         self.sev_means = {v: float(sev_df[v].mean()) for v in sev_vars}
 
     def _fitted(self) -> bool:
@@ -141,6 +119,7 @@ class ActuarialEngine:
         x = {
             "jeune": 1.0 if contract["age_conducteur"] < 25 else 0.0,
             "usage_pro": 1.0 if contract["usage"] == "professionnel" else 0.0,
+            "usage_taxi_moto": 1.0 if contract["usage"] == "taxi_moto" else 0.0,
             "zone_urbain": 1.0 if contract["zone"] == "urbain" else 0.0,
             "nb_sinistres_anterieurs": float(contract["nb_sinistres_anterieurs"]),
             "anciennete_plafonnee": min(float(contract["anciennete_permis"]), 20.0),
@@ -148,10 +127,10 @@ class ActuarialEngine:
             "puissance_cv": float(contract["puissance_cv"]),
         }
 
-        frequence, freq_baseline, freq_contrib = _decompose(
+        frequence, freq_baseline, freq_contrib = decompose(
             self.freq_model.params, self.freq_means, x
         )
-        cout_moyen, sev_baseline, sev_contrib = _decompose(
+        cout_moyen, sev_baseline, sev_contrib = decompose(
             self.sev_model.params, self.sev_means, x
         )
 

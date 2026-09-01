@@ -10,12 +10,15 @@ from sqlalchemy.orm import Session
 
 from app.actuarial.bonus_malus import compute_bonus_malus
 from app.actuarial.data_simulation import generate_portfolio
+from app.actuarial.habitation_data_simulation import generate_habitation_portfolio
+from app.actuarial.habitation_pricing import HabitationActuarialEngine
 from app.actuarial.pricing import ActuarialEngine
 from app.database import crud
 from app.database.session import get_db, init_db
 from app.regulatory.cima_countries import (
     CIMA_COUNTRIES,
     PRODUCT_AUTO_RC,
+    PRODUCT_HABITATION_MRH,
     CimaCountryCode,
     currency_for_country,
     load_all_regulatory_rules,
@@ -28,6 +31,10 @@ from app.schemas import (
     ClaimInput,
     ClaimResponse,
     ContractInput,
+    HabitationContractInput,
+    HabitationPricingResponse,
+    HabitationSimulationRequest,
+    HabitationSimulationResponse,
     PolicyResponse,
     PolicySubscriptionRequest,
     PortfolioKPIs,
@@ -42,7 +49,9 @@ from app.schemas import (
 PORTFOLIO_SIZE = 15_000
 PORTFOLIO_SEED = 42
 MODEL_VERSION = "GLM_FREQ_SEV_V1"
-PRODUCT = PRODUCT_AUTO_RC
+HABITATION_MODEL_VERSION = "GLM_FREQ_SEV_HABITATION_V1"
+PRODUCT_AUTO = PRODUCT_AUTO_RC
+PRODUCT_HABITATION = PRODUCT_HABITATION_MRH
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 MODEL_COMPARISON_PATH = Path(__file__).resolve().parent / "ml" / "comparison_results.json"
@@ -58,17 +67,23 @@ async def lifespan(app: FastAPI):
     engine.fit(portfolio)
     app.state.engine = engine
     app.state.portfolio = portfolio
+
+    habitation_portfolio = generate_habitation_portfolio(n=PORTFOLIO_SIZE, seed=PORTFOLIO_SEED)
+    habitation_engine = HabitationActuarialEngine()
+    habitation_engine.fit(habitation_portfolio)
+    app.state.habitation_engine = habitation_engine
+
     yield
 
 
 app = FastAPI(
-    title="AfriRisk Auto — moteur de tarification actuarielle CIMA",
+    title="AfriRisk — moteur de tarification actuarielle CIMA",
     description=(
-        "API de tarification automobile pour les 15 États membres de la CIMA, "
-        "calibrée sur un portefeuille synthétique unique (voir "
-        "docs/cahier_des_charges.md et docs/regulatory.md)."
+        "API de tarification multi-branches (auto, habitation) pour les 15 "
+        "États membres de la CIMA, calibrée sur des portefeuilles synthétiques "
+        "(voir docs/cahier_des_charges.md et docs/regulatory.md)."
     ),
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 
@@ -86,7 +101,7 @@ def tarif(contract: ContractInput, request: Request, db: Session = Depends(get_d
     engine: ActuarialEngine = request.app.state.engine
     result = engine.price(contract.model_dump())
 
-    reg_check = check_minimum_tariff(contract.country.value, PRODUCT, result.prime_commerciale)
+    reg_check = check_minimum_tariff(contract.country.value, PRODUCT_AUTO, result.prime_commerciale)
 
     row = crud.record_pricing_result(
         db,
@@ -159,6 +174,67 @@ def simulate(payload: SimulationRequest, request: Request) -> SimulationResponse
     return SimulationResponse(parametre=payload.parametre, points=points)
 
 
+@app.post("/habitation/tarif", response_model=HabitationPricingResponse)
+def habitation_tarif(
+    contract: HabitationContractInput, request: Request, db: Session = Depends(get_db)
+) -> HabitationPricingResponse:
+    """Tarification multirisque habitation (MRH) — même principe que
+    `POST /tarif` pour l'auto, moteur actuariel séparé
+    (`actuarial/habitation_pricing.py`). v0.5 : moteur de tarification
+    seulement, pas encore de souscription de police habitation (voir
+    docs/habitation.md).
+    """
+    engine: HabitationActuarialEngine = request.app.state.habitation_engine
+    result = engine.price(contract.model_dump())
+
+    reg_check = check_minimum_tariff(contract.country.value, PRODUCT_HABITATION, result.prime_commerciale)
+
+    row = crud.record_pricing_result(
+        db,
+        policy_id=None,
+        model_version=HABITATION_MODEL_VERSION,
+        regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
+        input_data=contract.model_dump(),
+        frequency=result.frequence_estimee,
+        severity=result.cout_moyen_estime,
+        pure_premium=result.prime_pure,
+        expenses=result.frais_gestion + result.marge_technique,
+        margin=result.marge_technique,
+        commercial_premium=result.prime_commerciale,
+    )
+    db.commit()
+    db.refresh(row)
+
+    return HabitationPricingResponse(
+        **result.__dict__,
+        model_version=HABITATION_MODEL_VERSION,
+        currency=currency_for_country(contract.country),
+        regulatory_check=RegulatoryCheck(
+            compliant=reg_check.compliant,
+            regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
+            message=reg_check.message,
+        ),
+        pricing_result_id=row.id,
+    )
+
+
+@app.post("/habitation/simulate", response_model=HabitationSimulationResponse)
+def habitation_simulate(payload: HabitationSimulationRequest, request: Request) -> HabitationSimulationResponse:
+    engine: HabitationActuarialEngine = request.app.state.habitation_engine
+    base = payload.contrat_base.model_dump()
+
+    points = []
+    for valeur in payload.valeurs:
+        contract = dict(base)
+        contract[payload.parametre] = (
+            int(valeur) if isinstance(base[payload.parametre], int) else valeur
+        )
+        result = engine.price(contract)
+        points.append(SimulationPoint(valeur=valeur, prime_commerciale=result.prime_commerciale))
+
+    return HabitationSimulationResponse(parametre=payload.parametre, points=points)
+
+
 @app.post("/policies", response_model=PolicyResponse)
 def subscribe_policy(
     payload: PolicySubscriptionRequest, request: Request, db: Session = Depends(get_db)
@@ -168,7 +244,7 @@ def subscribe_policy(
     """
     engine: ActuarialEngine = request.app.state.engine
     result = engine.price(payload.contract.model_dump())
-    reg_check = check_minimum_tariff(payload.contract.country.value, PRODUCT, result.prime_commerciale)
+    reg_check = check_minimum_tariff(payload.contract.country.value, PRODUCT_AUTO, result.prime_commerciale)
 
     customer = crud.create_customer(db, payload.customer.model_dump())
     vehicle = crud.create_vehicle(db, customer.id, payload.vehicle.model_dump())
@@ -177,7 +253,7 @@ def subscribe_policy(
         customer.id,
         vehicle.id,
         {
-            "product": PRODUCT,
+            "product": PRODUCT_AUTO,
             "start_date": payload.start_date,
             "end_date": payload.end_date,
             "coverage": payload.contract.garantie,
@@ -235,7 +311,7 @@ def get_policies(
     responses = []
     for p in policies:
         country = p.customer.country
-        reg_check = check_minimum_tariff(country, PRODUCT, p.premium)
+        reg_check = check_minimum_tariff(country, PRODUCT_AUTO, p.premium)
         responses.append(
             PolicyResponse(
                 id=p.id,

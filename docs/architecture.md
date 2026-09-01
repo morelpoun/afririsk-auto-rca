@@ -1,4 +1,4 @@
-# Architecture — AfriRisk Auto (CIMA)
+# Architecture — AfriRisk (CIMA, multi-branches)
 
 ## Vue d'ensemble
 
@@ -9,10 +9,13 @@ frontend/            interface statique (formulaire de cotation, dashboard)
 backend/app/
   main.py            routes FastAPI, orchestration
   schemas.py          contrats d'entrée/sortie (Pydantic)
-  actuarial/           moteur de tarification
-    data_simulation.py   portefeuille synthétique documenté
-    pricing.py            GLM fréquence (Poisson) + sévérité (Gamma), décomposition
-    bonus_malus.py         grille de coefficient par défaut (non réglementaire)
+  actuarial/           moteurs de tarification, un par branche
+    glm_utils.py          décomposition GLM partagée (auto + habitation)
+    data_simulation.py   portefeuille auto synthétique documenté
+    pricing.py            auto : GLM fréquence (Poisson) + sévérité (Gamma)
+    habitation_data_simulation.py  portefeuille habitation synthétique
+    habitation_pricing.py           habitation : même principe que pricing.py
+    bonus_malus.py         grille de coefficient par défaut (auto, non réglementaire)
   regulatory/          couche réglementaire configurable
     rules.py              modèle de règle + contrôle de tarif minimum
     cima_countries.py       table des 15 pays CIMA (devise, zone monétaire)
@@ -27,14 +30,17 @@ backend/app/
     comparison_results.json  résultat de la dernière comparaison, exposé par GET /models
 ```
 
-## Principe directeur : le moteur actuariel est séparé de l'API
+## Principe directeur : le moteur actuariel est séparé de l'API, un par branche
 
 `main.py` ne calcule jamais de prime lui-même. Il appelle
-`ActuarialEngine.price(contrat)` (dans `actuarial/pricing.py`), qui renvoie un
-`PricingResult` complet (fréquence, sévérité, prime pure, chargements, prime
-commerciale, décomposition explicative). Cela permet de faire évoluer le
-moteur (nouveaux modèles, nouvelles branches) sans toucher à l'API, et
-inversement.
+`ActuarialEngine.price(contrat)` (auto, `actuarial/pricing.py`) ou
+`HabitationActuarialEngine.price(contrat)` (habitation,
+`actuarial/habitation_pricing.py`), qui renvoient chacun un résultat complet
+(fréquence, sévérité, prime pure, chargements, prime commerciale,
+décomposition explicative). Chaque branche a son propre moteur, ses propres
+formules GLM et son propre portefeuille synthétique — seule la mécanique de
+décomposition explicative (`glm_utils.py`) est partagée. Ajouter une branche
+ne touche donc pas aux branches existantes.
 
 ## Cycle de vie d'une cotation (`POST /tarif`)
 

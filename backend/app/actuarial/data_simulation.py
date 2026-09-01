@@ -21,6 +21,7 @@ CURRENT_YEAR = 2026
 BASE_LOG_FREQUENCY = -2.1
 EFFECT_JEUNE_CONDUCTEUR = 0.45  # < 25 ans
 EFFECT_USAGE_PROFESSIONNEL = 0.20
+EFFECT_USAGE_TAXI_MOTO = 0.85  # transport de passagers, forte exposition/kilométrage urbain
 EFFECT_ZONE_URBAINE = 0.25
 EFFECT_SINISTRE_ANTERIEUR = 0.18  # par sinistre antérieur
 EFFECT_ANCIENNETE_PERMIS = -0.02  # par année d'ancienneté (plafonnée)
@@ -30,6 +31,7 @@ BASE_SEVERITY = 120_000.0
 EFFECT_VALEUR_VEHICULE = 0.025  # part de la valeur assurée
 EFFECT_ZONE_URBAINE_SEVERITY = 60_000.0
 EFFECT_PUISSANCE_SEVERITY = 8_000.0  # par CV
+EFFECT_USAGE_TAXI_MOTO_SEVERITY = -40_000.0  # réparation deux-roues moins coûteuse qu'une voiture
 
 
 def generate_portfolio(n: int = 15_000, seed: int = 42) -> pd.DataFrame:
@@ -42,7 +44,7 @@ def generate_portfolio(n: int = 15_000, seed: int = 42) -> pd.DataFrame:
     max_anciennete = np.maximum(age_conducteur - 18, 0)
     anciennete_permis = rng.integers(0, max_anciennete + 1)
 
-    usage = rng.choice(["particulier", "professionnel"], size=n, p=[0.8, 0.2])
+    usage = rng.choice(["particulier", "professionnel", "taxi_moto"], size=n, p=[0.72, 0.18, 0.10])
     zone = rng.choice(["urbain", "rural"], size=n, p=[0.6, 0.4])
     puissance_cv = rng.integers(4, 21, size=n)
     annee_vehicule = rng.integers(2000, CURRENT_YEAR, size=n)
@@ -56,6 +58,7 @@ def generate_portfolio(n: int = 15_000, seed: int = 42) -> pd.DataFrame:
 
     jeune = (age_conducteur < 25).astype(float)
     usage_pro = (usage == "professionnel").astype(float)
+    usage_taxi_moto = (usage == "taxi_moto").astype(float)
     zone_urbain = (zone == "urbain").astype(float)
     anciennete_plafonnee = np.minimum(anciennete_permis, 20)
 
@@ -63,6 +66,7 @@ def generate_portfolio(n: int = 15_000, seed: int = 42) -> pd.DataFrame:
         BASE_LOG_FREQUENCY
         + EFFECT_JEUNE_CONDUCTEUR * jeune
         + EFFECT_USAGE_PROFESSIONNEL * usage_pro
+        + EFFECT_USAGE_TAXI_MOTO * usage_taxi_moto
         + EFFECT_ZONE_URBAINE * zone_urbain
         + EFFECT_SINISTRE_ANTERIEUR * nb_sinistres_anterieurs
         + EFFECT_ANCIENNETE_PERMIS * anciennete_plafonnee
@@ -75,7 +79,9 @@ def generate_portfolio(n: int = 15_000, seed: int = 42) -> pd.DataFrame:
         + EFFECT_VALEUR_VEHICULE * valeur_vehicule_fcfa
         + EFFECT_ZONE_URBAINE_SEVERITY * zone_urbain
         + EFFECT_PUISSANCE_SEVERITY * puissance_cv
+        + EFFECT_USAGE_TAXI_MOTO_SEVERITY * usage_taxi_moto
     )
+    mean_cost = np.maximum(mean_cost, 20_000.0)  # plancher pour éviter une moyenne Gamma négative/nulle
     # Gamma(shape=2) borné positif, moyenne = mean_cost
     shape = 2.0
     cost_draws = rng.gamma(shape=shape, scale=mean_cost / shape, size=n)

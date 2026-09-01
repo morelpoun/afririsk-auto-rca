@@ -43,8 +43,10 @@ Ce qui ne varie *pas* (encore) :
   et une fonction `check_minimum_tariff(...)` qui compare la prime calculée au
   minimum configuré, s'il existe.
 - `regulatory/cima_countries.py` : la table des 15 États membres CIMA (code,
-  nom, devise, zone monétaire UEMOA/CEMAC) et `load_all_regulatory_rules()`
-  qui enregistre une règle RC auto par pays.
+  nom, devise, zone monétaire UEMOA/CEMAC), la liste des produits supportés
+  (`PRODUCTS` : `AUTO_RC`, `HABITATION_MRH`) et `load_all_regulatory_rules()`
+  qui enregistre une règle par (pays, produit) — une nouvelle branche n'a
+  besoin que d'ajouter son code produit à `PRODUCTS`.
 
 ## Ce qui n'est délibérément pas implémenté
 

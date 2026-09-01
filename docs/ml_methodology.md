@@ -31,10 +31,15 @@ pour les trois modèles.
 
 ```text
 Modèle                        RMSE           MAE      Gini
-GLM_FREQ_SEV_V1            216 128       107 784     0.245
-TWEEDIE_GLM_V1              216 263       108 380     0.230
-XGBOOST_TWEEDIE_V1          217 341       103 051     0.231
+GLM_FREQ_SEV_V1            257 901       122 052     0.310
+TWEEDIE_GLM_V1              258 555       122 308     0.286
+XGBOOST_TWEEDIE_V1          260 738       117 641     0.219
 ```
+
+(Mis à jour en v0.5 après l'ajout du facteur taxi-moto à la branche auto,
+qui améliore le pouvoir de discrimination du portefeuille pour les trois
+modèles — mais davantage pour le GLM, cohérent avec le fait que la donnée
+simulée reste générée par une relation log-linéaire.)
 
 Sur ce portefeuille **synthétique** (généré par une relation log-linéaire —
 voir `backend/app/actuarial/data_simulation.py`), le GLM fréquence×sévérité

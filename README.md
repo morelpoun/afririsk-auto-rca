@@ -1,21 +1,22 @@
-# AfriRisk Auto — moteur de tarification actuarielle CIMA
+# AfriRisk — moteur de tarification actuarielle multi-branches CIMA
 
-Moteur de tarification actuarielle pour l'assurance automobile particulière
-dans les 15 États membres de la CIMA. L'API calcule une prime pure et une
-prime commerciale à partir des caractéristiques d'un contrat, avec des modèles
-de fréquence (GLM Poisson) et de sévérité (GLM Gamma) calibrés pour
-l'instant sur un portefeuille synthétique documenté et **partagé par tous
-les pays** (voir `docs/regulatory.md` — aucune donnée réelle ne permet
-encore de différencier le risque par pays), une couche réglementaire et une
-devise configurables par pays, et une traçabilité complète de chaque
-cotation.
+Moteur de tarification actuarielle pour les 15 États membres de la CIMA,
+auto (y compris taxi-moto) et habitation (MRH). L'API calcule une prime pure
+et une prime commerciale à partir des caractéristiques d'un contrat, avec des
+modèles de fréquence (GLM Poisson) et de sévérité (GLM Gamma) — un moteur par
+branche — calibrés pour l'instant sur un portefeuille synthétique documenté
+et **partagé par tous les pays** (voir `docs/regulatory.md` — aucune donnée
+réelle ne permet encore de différencier le risque par pays), une couche
+réglementaire et une devise configurables par pays, et une traçabilité
+complète de chaque cotation.
 
 Voir [`docs/cahier_des_charges.md`](docs/cahier_des_charges.md) (périmètre,
 hypothèses, feuille de route), [`docs/architecture.md`](docs/architecture.md),
 [`docs/regulatory.md`](docs/regulatory.md) (couche réglementaire CIMA),
 [`docs/ml_methodology.md`](docs/ml_methodology.md) (comparaison GLM / Tweedie
-/ XGBoost+SHAP) et [`docs/claims.md`](docs/claims.md) (souscription, sinistres,
-bonus-malus, KPI de rentabilité).
+/ XGBoost+SHAP), [`docs/claims.md`](docs/claims.md) (souscription, sinistres,
+bonus-malus, KPI de rentabilité — branche auto) et
+[`docs/habitation.md`](docs/habitation.md) (branche habitation).
 
 ## Démarrage rapide avec Docker (recommandé)
 
@@ -77,6 +78,30 @@ contraignant tant qu'aucune valeur validée n'est configurée, voir
 et renvoie la prime commerciale à chaque point (courbe de sensibilité).
 `GET /portfolio/metrics` renvoie les KPI agrégés du portefeuille synthétique.
 
+## Branche habitation (MRH)
+
+`POST /habitation/tarif` et `POST /habitation/simulate` — même principe que
+l'auto, moteur de tarification séparé (voir `docs/habitation.md`). Pas
+encore de souscription de police ni de sinistres pour cette branche.
+
+```bash
+curl -X POST http://localhost:8000/habitation/tarif \
+  -H "Content-Type: application/json" \
+  -d '{
+    "country": "CF",
+    "type_logement": "maison",
+    "zone": "urbain",
+    "surface_m2": 120,
+    "materiaux_construction": "semi_dur",
+    "valeur_batiment": 15000000,
+    "valeur_contenu": 3000000,
+    "anciennete_batiment": 15,
+    "securite": false,
+    "nb_sinistres_anterieurs": 0,
+    "garantie": "multirisque"
+  }'
+```
+
 ## Souscription, sinistres et bonus-malus
 
 `POST /policies` souscrit une police (client + véhicule + contrat tarifé) ;
@@ -134,8 +159,11 @@ cd backend && python -m pytest
 - ✅ Bonus-malus, souscription/sinistres, KPI de rentabilité réels (v0.3)
 - ✅ Extension aux 15 pays CIMA — réglementaire/devise par pays, modèle de
   risque encore partagé (v0.4, voir `docs/regulatory.md`)
+- ✅ Taxi-moto (auto) et branche habitation MRH — moteur de tarification
+  complet, pas encore souscription/sinistres (v0.5, voir `docs/habitation.md`)
 - ⬜ Authentification/RBAC, frontend React/Next.js complet, facturation SaaS
 - ⬜ Calibration du risque par pays sur données réelles
-- ⬜ Extension multi-branches (santé, habitation, vie...)
+- ⬜ Santé et vie (paradigmes actuariels différents de l'habitation — voir
+  `docs/cahier_des_charges.md` §10)
 
 Voir le cahier des charges pour le détail des hypothèses et des jalons.

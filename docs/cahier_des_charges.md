@@ -1,26 +1,31 @@
-# Cahier des charges — "AfriRisk Auto" (tarification auto CIMA)
+# Cahier des charges — "AfriRisk" (tarification multi-branches CIMA)
 
 ## 1. Objectif
 Fournir un outil permettant à un assureur ou courtier des 15 États membres de
-la CIMA de saisir les caractéristiques d'un contrat auto et d'obtenir
-instantanément une prime pure et une prime commerciale, calculées par un
-moteur actuariel transparent et explicable.
+la CIMA de saisir les caractéristiques d'un contrat (auto, puis habitation)
+et d'obtenir instantanément une prime pure et une prime commerciale,
+calculées par un moteur actuariel transparent et explicable.
 
 ## 2. Périmètre
 
 **Dans le périmètre :**
-- Une seule branche : assurance automobile particulière (hors flottes, hors taxis)
-- Les 15 États membres de la CIMA, avec **un seul modèle de risque partagé**
-  (voir `docs/regulatory.md`) — seuls la devise et le contrôle réglementaire
-  varient par pays, pas encore le risque lui-même faute de données réelles
-  par marché
-- Calcul de prime à la souscription, souscription de polices, déclaration de
-  sinistres et KPI de rentabilité (loss/expense/combined ratio) — pas de
-  provisionnement actuariel des sinistres (IBNR, triangles)
+- Deux branches : assurance automobile particulière (y compris taxi-moto) et
+  multirisque habitation (MRH) — voir `docs/habitation.md`. Auto a le cycle
+  de vie complet (souscription, sinistres, KPI) ; habitation n'a pour
+  l'instant que le moteur de tarification (`POST /habitation/tarif`)
+- Les 15 États membres de la CIMA, avec **un seul modèle de risque partagé
+  par branche** (voir `docs/regulatory.md`) — seuls la devise et le contrôle
+  réglementaire varient par pays, pas encore le risque lui-même faute de
+  données réelles par marché
+- Pour l'auto : calcul de prime à la souscription, souscription de polices,
+  déclaration de sinistres et KPI de rentabilité (loss/expense/combined
+  ratio) — pas de provisionnement actuariel des sinistres (IBNR, triangles)
 - Données simulées, calibrées sur des hypothèses de marché documentées et ajustables
 
 **Hors périmètre (phases suivantes) :**
-- Autres branches (santé, habitation, vie...)
+- Santé et vie — voir §10 pour pourquoi elles ne sont pas traitées comme
+  l'habitation (paradigmes actuariels différents)
+- Cycle de vie complet (souscription/sinistres/KPI) pour l'habitation
 - Calibration du risque par pays sur données réelles (voir `docs/regulatory.md`)
 - Scoring fraude, provisionnement (IBNR), MLflow (registre de modèles versionné)
 - Authentification/RBAC
@@ -40,8 +45,11 @@ science requises côté utilisateur final.
 - Véhicule : puissance (CV), année de mise en circulation, valeur assurée
   (devise du pays sélectionné)
 - Contexte : zone urbaine (capitale/grande ville) ou rurale, usage (particulier
-  / professionnel), nombre d'années assuré, nombre de sinistres antérieurs
+  / professionnel / taxi-moto), nombre d'années assuré, nombre de sinistres
+  antérieurs
 - Garantie : tiers simple / tiers étendu / tous risques
+
+Pour l'habitation, voir `docs/habitation.md`.
 
 ## 5. Moteur actuariel
 - **Fréquence de sinistre** : GLM Poisson (offset = exposition), variables ci-dessus
@@ -101,9 +109,36 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
    calibration par pays hors périmètre tant que des données réelles ne sont
    pas disponibles
 10. ⬜ Authentification/RBAC, frontend React/Next.js complet, facturation SaaS
-11. ⬜ Extension multi-branches (santé, habitation, vie...)
+11. 🟡 Extension multi-branches (v0.5, voir `docs/habitation.md`) — habitation
+    (MRH) livrée avec moteur de tarification complet (fréquence×sévérité,
+    explicabilité) et taxi-moto ajouté à la branche auto ; souscription/
+    sinistres/KPI habitation, santé et vie restent à faire (§10 explique
+    pourquoi santé et vie ne sont pas traitées de la même manière)
 
-## 9. Risques principaux
+## 10. Pourquoi santé et vie ne sont pas traitées comme l'habitation
+L'habitation a pu être ajoutée comme un second incrément direct de l'auto
+parce qu'elle suit le **même paradigme actuariel** : fréquence de sinistre ×
+sévérité, modélisée par GLM Poisson/Gamma sur des facteurs de risque
+observables à la souscription. Santé et vie sont différentes :
+
+- **Vie** repose sur des **tables de mortalité/survie**, pas sur une
+  fréquence de sinistre au sens habituel — il s'agit de modéliser la
+  probabilité de décès par âge et d'actualiser des flux futurs (valeur
+  actuelle probable des prestations), un outillage mathématique distinct
+  (tables actuarielles, taux technique, provisions mathématiques) qui
+  mériterait son propre moteur plutôt qu'une adaptation du moteur
+  fréquence×sévérité existant.
+- **Santé** est actuariellement plus proche du paradigme fréquence×sévérité,
+  mais soulève des enjeux supplémentaires : données médicales (sensibilité
+  et réglementation sur les données de santé), réseaux de soins et tarifs
+  conventionnés propres à chaque pays, sélection adverse et anti-sélection à
+  gérer explicitement — un périmètre qui mérite d'être cadré avant de coder,
+  pas improvisé dans le même mouvement que l'habitation.
+
+Ces deux branches restent donc de futurs incréments séparés, chacun avec sa
+propre conception, plutôt que des variantes rapides du moteur auto/habitation.
+
+## 11. Risques principaux
 - Sans données réelles, le modèle reste démonstratif — une mise en production
   nécessite une calibration sur les données d'une vraie compagnie
 - Le même modèle de risque est utilisé pour les 15 pays CIMA (voir

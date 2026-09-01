@@ -37,6 +37,7 @@ def test_tarif_returns_coherent_pricing():
     assert set(data["frequence_contributions"]) == {
         "jeune",
         "usage_pro",
+        "usage_taxi_moto",
         "zone_urbain",
         "nb_sinistres_anterieurs",
         "anciennete_plafonnee",
@@ -140,6 +141,23 @@ def test_same_contract_prices_identically_regardless_of_country():
 
     assert cf_result["prime_commerciale"] == cm_result["prime_commerciale"]
     assert cf_result["currency"] == cm_result["currency"] == "XAF"  # CF et CM partagent la zone CEMAC
+
+
+def test_taxi_moto_usage_increases_frequency():
+    with TestClient(app) as client:
+        particulier = client.post("/tarif", json=BASE_CONTRACT).json()
+        taxi_moto_contract = dict(BASE_CONTRACT, usage="taxi_moto")
+        taxi_moto = client.post("/tarif", json=taxi_moto_contract).json()
+
+    assert taxi_moto["frequence_estimee"] > particulier["frequence_estimee"]
+    assert set(taxi_moto["frequence_contributions"]) == {
+        "jeune",
+        "usage_pro",
+        "usage_taxi_moto",
+        "zone_urbain",
+        "nb_sinistres_anterieurs",
+        "anciennete_plafonnee",
+    }
 
 
 def test_bonus_malus_coefficient_reduces_premium():
