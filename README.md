@@ -15,7 +15,7 @@ hypothèses, feuille de route), [`docs/architecture.md`](docs/architecture.md),
 [`docs/regulatory.md`](docs/regulatory.md) (couche réglementaire CIMA),
 [`docs/ml_methodology.md`](docs/ml_methodology.md) (comparaison GLM / Tweedie
 / XGBoost+SHAP), [`docs/claims.md`](docs/claims.md) (souscription, sinistres,
-bonus-malus, KPI de rentabilité — branche auto) et
+bonus-malus, KPI de rentabilité branche auto) et
 [`docs/habitation.md`](docs/habitation.md) (branche habitation).
 
 ## Démarrage rapide avec Docker (recommandé)
