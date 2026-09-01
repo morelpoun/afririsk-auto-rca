@@ -38,14 +38,14 @@ uvicorn app.main:app --reload
 ```
 
 Sans variable `DATABASE_URL`, l'application utilise SQLite en local
-(`backend/afririsk.db`, non versionné) — zéro configuration nécessaire pour
+(`backend/afririsk.db`, non versionné) zéro configuration nécessaire pour
 développer. Copier `.env.example` en `.env` pour pointer vers un PostgreSQL
 existant si besoin.
 
 ## Interface
 
-- `http://localhost:8000/app/index.html` — formulaire de cotation
-- `http://localhost:8000/app/dashboard.html` — KPI du portefeuille synthétique
+- `http://localhost:8000/app/index.html` formulaire de cotation
+- `http://localhost:8000/app/dashboard.html` KPI du portefeuille synthétique
 
 ## Exemple d'appel API
 
