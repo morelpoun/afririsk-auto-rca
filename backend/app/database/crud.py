@@ -37,6 +37,42 @@ def create_claim(db: Session, data: dict) -> models.Claim:
     return claim
 
 
+def record_pricing_result(
+    db: Session,
+    *,
+    policy_id: int | None,
+    model_version: str,
+    regulatory_version: str | None,
+    input_data: dict,
+    frequency: float,
+    severity: float,
+    pure_premium: float,
+    expenses: float,
+    margin: float,
+    commercial_premium: float,
+) -> models.PricingResult:
+    """Point unique de construction d'une ligne `pricing_results`, utilisé
+    aussi bien par la souscription (`POST /policies`) que par le générateur
+    de données de démonstration (`scripts/seed_database.py`), pour éviter que
+    les deux chemins ne divergent silencieusement.
+    """
+    row = models.PricingResult(
+        policy_id=policy_id,
+        model_version=model_version,
+        regulatory_version=regulatory_version,
+        input_data=input_data,
+        frequency=frequency,
+        severity=severity,
+        pure_premium=pure_premium,
+        expenses=expenses,
+        margin=margin,
+        commercial_premium=commercial_premium,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
 def get_policy(db: Session, policy_id: int) -> models.Policy | None:
     return db.get(models.Policy, policy_id)
 
@@ -44,6 +80,23 @@ def get_policy(db: Session, policy_id: int) -> models.Policy | None:
 def list_policies(db: Session, limit: int = 50, offset: int = 0) -> list[models.Policy]:
     stmt = select(models.Policy).order_by(models.Policy.id.desc()).limit(limit).offset(offset)
     return list(db.scalars(stmt))
+
+
+def pricing_result_ids_for_policies(db: Session, policy_ids: list[int]) -> dict[int, int]:
+    """Dernier `pricing_results.id` connu par police (une police peut en
+    théorie être re-tarifée ; on garde le plus récent).
+    """
+    if not policy_ids:
+        return {}
+    stmt = (
+        select(models.PricingResult)
+        .where(models.PricingResult.policy_id.in_(policy_ids))
+        .order_by(models.PricingResult.id.desc())
+    )
+    mapping: dict[int, int] = {}
+    for row in db.scalars(stmt):
+        mapping.setdefault(row.policy_id, row.id)
+    return mapping
 
 
 def list_claims(db: Session, policy_id: int | None = None, limit: int = 50, offset: int = 0) -> list[models.Claim]:

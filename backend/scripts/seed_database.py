@@ -16,7 +16,6 @@ from datetime import date, timedelta
 from app.actuarial.data_simulation import generate_portfolio
 from app.actuarial.pricing import ActuarialEngine
 from app.database import crud
-from app.database import models as db_models
 from app.database.session import SessionLocal, init_db
 from app.regulatory.countries import cf as cf_rules
 from app.regulatory.rules import check_minimum_tariff
@@ -114,20 +113,18 @@ def seed(n: int, seed_value: int = 123) -> None:
                 },
             )
 
-            db.flush()
-            db.add(
-                db_models.PricingResult(
-                    policy_id=policy.id,
-                    model_version=MODEL_VERSION,
-                    regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
-                    input_data=contract,
-                    frequency=result.frequence_estimee,
-                    severity=result.cout_moyen_estime,
-                    pure_premium=result.prime_pure,
-                    expenses=result.frais_gestion + result.marge_technique,
-                    margin=result.marge_technique,
-                    commercial_premium=result.prime_commerciale,
-                )
+            crud.record_pricing_result(
+                db,
+                policy_id=policy.id,
+                model_version=MODEL_VERSION,
+                regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
+                input_data=contract,
+                frequency=result.frequence_estimee,
+                severity=result.cout_moyen_estime,
+                pure_premium=result.prime_pure,
+                expenses=result.frais_gestion + result.marge_technique,
+                margin=result.marge_technique,
+                commercial_premium=result.prime_commerciale,
             )
             n_policies += 1
 

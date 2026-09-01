@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.actuarial.bonus_malus import compute_bonus_malus
 from app.actuarial.data_simulation import generate_portfolio
 from app.actuarial.pricing import ActuarialEngine
-from app.database import crud, models
+from app.database import crud
 from app.database.session import get_db, init_db
 from app.regulatory.countries import cf as cf_rules
 from app.regulatory.rules import check_minimum_tariff
@@ -82,7 +82,9 @@ def tarif(contract: ContractInput, request: Request, db: Session = Depends(get_d
 
     reg_check = check_minimum_tariff(COUNTRY, PRODUCT, result.prime_commerciale)
 
-    row = models.PricingResult(
+    row = crud.record_pricing_result(
+        db,
+        policy_id=None,
         model_version=MODEL_VERSION,
         regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
         input_data=contract.model_dump(),
@@ -93,7 +95,6 @@ def tarif(contract: ContractInput, request: Request, db: Session = Depends(get_d
         margin=result.marge_technique,
         commercial_premium=result.prime_commerciale,
     )
-    db.add(row)
     db.commit()
     db.refresh(row)
 
@@ -164,7 +165,8 @@ def subscribe_policy(
         },
     )
 
-    pricing_row = models.PricingResult(
+    pricing_row = crud.record_pricing_result(
+        db,
         policy_id=policy.id,
         model_version=MODEL_VERSION,
         regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
@@ -176,7 +178,6 @@ def subscribe_policy(
         margin=result.marge_technique,
         commercial_premium=result.prime_commerciale,
     )
-    db.add(pricing_row)
     db.commit()
     db.refresh(policy)
     db.refresh(pricing_row)
@@ -193,6 +194,11 @@ def subscribe_policy(
         premium=policy.premium,
         status=policy.status,
         pricing_result_id=pricing_row.id,
+        regulatory_check=RegulatoryCheck(
+            compliant=reg_check.compliant,
+            regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
+            message=reg_check.message,
+        ),
     )
 
 
@@ -201,21 +207,32 @@ def get_policies(
     limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)
 ) -> list[PolicyResponse]:
     policies = crud.list_policies(db, limit=limit, offset=offset)
-    return [
-        PolicyResponse(
-            id=p.id,
-            customer_id=p.customer_id,
-            vehicle_id=p.vehicle_id,
-            product=p.product,
-            start_date=p.start_date,
-            end_date=p.end_date,
-            coverage=p.coverage,
-            deductible=p.deductible,
-            premium=p.premium,
-            status=p.status,
+    pricing_result_ids = crud.pricing_result_ids_for_policies(db, [p.id for p in policies])
+
+    responses = []
+    for p in policies:
+        reg_check = check_minimum_tariff(COUNTRY, PRODUCT, p.premium)
+        responses.append(
+            PolicyResponse(
+                id=p.id,
+                customer_id=p.customer_id,
+                vehicle_id=p.vehicle_id,
+                product=p.product,
+                start_date=p.start_date,
+                end_date=p.end_date,
+                coverage=p.coverage,
+                deductible=p.deductible,
+                premium=p.premium,
+                status=p.status,
+                pricing_result_id=pricing_result_ids.get(p.id),
+                regulatory_check=RegulatoryCheck(
+                    compliant=reg_check.compliant,
+                    regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
+                    message=reg_check.message,
+                ),
+            )
         )
-        for p in policies
-    ]
+    return responses
 
 
 @app.post("/claims", response_model=ClaimResponse)

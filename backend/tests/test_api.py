@@ -125,6 +125,12 @@ def test_bonus_malus_compute_endpoint():
     assert "avertissement" in data
 
 
+def test_bonus_malus_rejects_negative_claim_counts():
+    with TestClient(app) as client:
+        response = client.post("/bonus-malus/compute", json={"historique_sinistres": [0, -5, 1]})
+    assert response.status_code == 422
+
+
 def test_policy_subscription_and_claim_flow():
     payload = {
         "customer": {
@@ -153,9 +159,12 @@ def test_policy_subscription_and_claim_flow():
         policy = policy_response.json()
         assert policy["premium"] > 0
         assert policy["pricing_result_id"] is not None
+        assert policy["regulatory_check"]["compliant"] is True
 
         listed = client.get("/policies").json()
-        assert any(p["id"] == policy["id"] for p in listed)
+        listed_policy = next(p for p in listed if p["id"] == policy["id"])
+        assert listed_policy["pricing_result_id"] == policy["pricing_result_id"]
+        assert listed_policy["regulatory_check"]["compliant"] is True
 
         claim_response = client.post(
             "/claims",

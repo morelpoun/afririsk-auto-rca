@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -91,7 +91,7 @@ class PortfolioKPIs(BaseModel):
 
 
 class BonusMalusRequest(BaseModel):
-    historique_sinistres: list[int] = Field(
+    historique_sinistres: list[Annotated[int, Field(ge=0, le=20)]] = Field(
         ..., min_length=1, max_length=30, description="Sinistres responsables par année, du plus ancien au plus récent"
     )
 
@@ -143,6 +143,7 @@ class PolicyResponse(BaseModel):
     premium: float
     status: str
     pricing_result_id: int | None = None
+    regulatory_check: RegulatoryCheck
 
     model_config = {"from_attributes": True}
 
