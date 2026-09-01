@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+from app.database import models
+from app.database.session import SessionLocal
 from app.main import app
 
 BASE_CONTRACT = {
@@ -38,6 +40,21 @@ def test_tarif_returns_coherent_pricing():
         "nb_sinistres_anterieurs",
         "anciennete_plafonnee",
     }
+    assert data["model_version"] == "GLM_FREQ_SEV_V1"
+    assert data["pricing_result_id"] is not None
+    # Aucun tarif minimum CIMA/RCA n'est encore configuré (valeur non validée) :
+    # le contrôle réglementaire doit donc rester non bloquant pour l'instant.
+    assert data["regulatory_check"]["compliant"] is True
+
+
+def test_portfolio_metrics_endpoint():
+    with TestClient(app) as client:
+        response = client.get("/portfolio/metrics")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["nombre_contrats"] > 0
+    assert 0 < data["frequence_moyenne"] < 1
+    assert data["cout_moyen_sinistre"] > 0
 
 
 def test_young_driver_pays_more_all_else_equal():
@@ -56,6 +73,21 @@ def test_prior_claims_increase_frequency():
         risky = client.post("/tarif", json=risky_contract).json()
 
     assert risky["frequence_estimee"] > clean["frequence_estimee"]
+
+
+def test_tarif_is_persisted_to_pricing_results():
+    with TestClient(app) as client:
+        response = client.post("/tarif", json=BASE_CONTRACT)
+        pricing_result_id = response.json()["pricing_result_id"]
+
+    db = SessionLocal()
+    try:
+        row = db.get(models.PricingResult, pricing_result_id)
+        assert row is not None
+        assert row.model_version == "GLM_FREQ_SEV_V1"
+        assert row.input_data["age_conducteur"] == BASE_CONTRACT["age_conducteur"]
+    finally:
+        db.close()
 
 
 def test_simulate_endpoint_returns_one_point_per_value():

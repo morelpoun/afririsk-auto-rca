@@ -1,10 +1,10 @@
 """Calibre le moteur actuariel sur le portefeuille simulé et affiche les
 résumés des modèles GLM ainsi qu'un exemple de tarification.
 
-Usage: python -m scripts.calibrate (depuis afririsk-auto-rca/)
+Usage: python -m scripts.calibrate (depuis afririsk-auto-rca/backend/)
 """
-from app.actuarial_model import ActuarialEngine
-from app.data_simulation import generate_portfolio
+from app.actuarial.data_simulation import generate_portfolio
+from app.actuarial.pricing import ActuarialEngine
 
 
 def main() -> None:

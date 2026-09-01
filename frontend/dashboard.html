@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AfriRisk Auto — Portefeuille</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 2rem 1rem 4rem;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  header { margin-bottom: 1.5rem; }
+  header h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
+  header p { color: var(--muted); margin: 0; font-size: 0.9rem; }
+  nav a { color: var(--muted); font-size: 0.85rem; text-decoration: none; }
+  nav a:hover { color: var(--text); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+  }
+  .card .label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .card .value { font-size: 1.5rem; font-weight: 700; margin-top: 0.35rem; }
+  .note {
+    margin-top: 2rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+  }
+  .placeholder { color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>AfriRisk Auto — Portefeuille</h1>
+    <p>Indicateurs calculés sur le portefeuille synthétique de calibration (MVP)</p>
+    <nav><a href="/app/index.html">← Nouvelle tarification</a></nav>
+  </header>
+
+  <div class="cards" id="cards">
+    <div class="placeholder">Chargement…</div>
+  </div>
+
+  <p class="note">
+    Ce portefeuille est simulé, pas issu de données réelles d'un assureur —
+    voir docs/cahier_des_charges.md. Les KPI de rentabilité (loss ratio,
+    combined ratio) nécessitent un historique de sinistres/primes réels et
+    seront ajoutés lorsque le module sinistres sera branché à une base de
+    contrats réels (v0.3).
+  </p>
+</div>
+
+<script>
+const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
+
+fetch('/portfolio/metrics')
+  .then((res) => res.json())
+  .then((data) => {
+    document.getElementById('cards').innerHTML = `
+      <div class="card"><div class="label">Contrats</div><div class="value">${fmt(data.nombre_contrats)}</div></div>
+      <div class="card"><div class="label">Fréquence moyenne</div><div class="value">${(data.frequence_moyenne * 100).toFixed(1)} %</div></div>
+      <div class="card"><div class="label">Coût moyen sinistre</div><div class="value">${fmt(data.cout_moyen_sinistre)} FCFA</div></div>
+      <div class="card"><div class="label">Prime pure moyenne</div><div class="value">${fmt(data.prime_pure_moyenne)} FCFA</div></div>
+      <div class="card"><div class="label">Sinistres observés</div><div class="value">${fmt(data.nombre_sinistres)}</div></div>
+      <div class="card"><div class="label">Exposition totale</div><div class="value">${fmt(data.exposition_totale)} an.</div></div>
+    `;
+  })
+  .catch(() => {
+    document.getElementById('cards').innerHTML = '<div class="placeholder">Impossible de charger les métriques.</div>';
+  });
+</script>
+</body>
+</html>

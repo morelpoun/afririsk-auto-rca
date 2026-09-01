@@ -20,6 +20,12 @@ class ContractInput(BaseModel):
     nb_sinistres_anterieurs: int = Field(0, ge=0, le=20)
 
 
+class RegulatoryCheck(BaseModel):
+    compliant: bool
+    regulatory_version: str | None
+    message: str
+
+
 class PricingResponse(BaseModel):
     frequence_estimee: float
     cout_moyen_estime: float
@@ -32,6 +38,9 @@ class PricingResponse(BaseModel):
     severite_contributions: dict[str, float]
     frequence_moyenne_portefeuille: float
     cout_moyen_portefeuille: float
+    model_version: str
+    regulatory_check: RegulatoryCheck
+    pricing_result_id: int | None = None
 
 
 class SimulationRequest(BaseModel):
@@ -54,3 +63,12 @@ class SimulationPoint(BaseModel):
 class SimulationResponse(BaseModel):
     parametre: str
     points: list[SimulationPoint]
+
+
+class PortfolioMetrics(BaseModel):
+    nombre_contrats: int
+    frequence_moyenne: float
+    cout_moyen_sinistre: float
+    prime_pure_moyenne: float
+    exposition_totale: float
+    nombre_sinistres: int

@@ -15,10 +15,13 @@ une prime commerciale, calculées par un moteur actuariel transparent et explica
 
 **Hors périmètre (phases suivantes) :**
 - Autres branches (santé, habitation, vie...)
-- Autres pays
-- Bonus-malus historique réel, scoring fraude, provisions techniques
+- Autres pays (l'architecture le permet — voir `docs/regulatory.md` — mais seule
+  la RCA est configurée)
+- Bonus-malus, scoring fraude, modèles Tweedie/ML (XGBoost) + SHAP, MLflow
+- Authentification/RBAC
+- Frontend React/Next.js aboutissant (le MVP a une interface statique minimale,
+  voir §7)
 - Données réelles compagnie (phase 4)
-- Interface web (frontend React) — le MVP actuel expose une API
 
 ## 3. Utilisateur cible
 Chargé de tarification / souscripteur dans une compagnie ou un courtier. L'API est
@@ -45,25 +48,39 @@ science requises côté utilisateur final.
 
 ## 6. Données v1
 Portefeuille synthétique généré avec des relations réalistes documentées dans le
-code (`app/data_simulation.py`) : conducteurs jeunes et zone urbaine plus
-risqués, sinistralité antérieure comme facteur aggravant, coût moyen lié à la
-valeur du véhicule et à la zone. Ces hypothèses sont des points de départ
-démonstratifs, à recalibrer sur données réelles en phase 4.
+code (`backend/app/actuarial/data_simulation.py`) : conducteurs jeunes et zone
+urbaine plus risqués, sinistralité antérieure comme facteur aggravant, coût
+moyen lié à la valeur du véhicule et à la zone. Ces hypothèses sont des points
+de départ démonstratifs, à recalibrer sur données réelles en phase 4.
 
 ## 7. Architecture technique (MVP actuel)
-- Backend : Python + FastAPI
+- Backend : Python + FastAPI, structuré en sous-modules `actuarial/`
+  (fréquence/sévérité/prime), `regulatory/` (règles CIMA configurables par
+  pays) et `database/` (persistance)
 - Moteur actuariel : pandas, numpy, statsmodels (GLM Poisson / Gamma)
-- Pas de base de données en v1 : portefeuille simulé généré et les modèles
-  ajustés au démarrage de l'application (volume réduit, calcul rapide)
-- Frontend : non inclus dans ce MVP (prochaine phase)
+- Persistance : PostgreSQL via `docker-compose` (SQLite en développement/tests
+  sans configuration). Chaque tarification est tracée dans `pricing_results`
+  (entrées, modèle, version réglementaire) pour pouvoir reconstruire un calcul
+  passé — voir `docs/architecture.md`
+- Réglementaire : couche `regulatory/` configurable par (pays, produit), voir
+  `docs/regulatory.md` — le tarif minimum CIMA/RCA n'est pas codé en dur tant
+  qu'il n'a pas été obtenu et validé auprès du régulateur
+- Frontend : interface statique minimale (`frontend/index.html` formulaire de
+  cotation, `frontend/dashboard.html` KPI portefeuille), servie par FastAPI en
+  HTML/JS vanilla — un frontend React/Next.js plus riche reste une évolution
+  possible, pas un prérequis du MVP
 
 ## 8. Jalons
 1. ✅ Hypothèses de tarification + génération de données simulées + moteur GLM
-2. ✅ API FastAPI (`/tarif`, `/simulate`) testable via Swagger
-3. ⬜ Frontend (formulaire de saisie + graphique de sensibilité)
-4. ⬜ Partenariat avec une compagnie RCA pour données réelles anonymisées et
+2. ✅ API FastAPI (`/tarif`, `/simulate`, `/portfolio/metrics`) testable via Swagger
+3. ✅ Persistance PostgreSQL + traçabilité de chaque cotation
+4. ✅ Couche réglementaire configurable (CIMA/RCA)
+5. ✅ Interface de tarification et dashboard minimalistes
+6. ⬜ Modèles Tweedie / ML (XGBoost) + explicabilité SHAP, comparaison de modèles
+7. ⬜ Bonus-malus, gestion des sinistres, KPI de rentabilité (loss/combined ratio)
+8. ⬜ Partenariat avec une compagnie RCA pour données réelles anonymisées et
    recalibration des modèles
-5. ⬜ Extension multi-branches / multi-pays
+9. ⬜ Extension multi-branches / multi-pays (Cameroun, Gabon, ...)
 
 ## 9. Risques principaux
 - Sans données réelles, le modèle reste démonstratif — une mise en production
