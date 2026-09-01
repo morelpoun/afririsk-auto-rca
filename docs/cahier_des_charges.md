@@ -19,7 +19,7 @@ calculées par un moteur actuariel transparent et explicable.
   données réelles par marché
 - Pour l'auto : calcul de prime à la souscription, souscription de polices,
   déclaration de sinistres et KPI de rentabilité (loss/expense/combined
-  ratio) — pas de provisionnement actuariel des sinistres (IBNR, triangles)
+  ratio) pas de provisionnement actuariel des sinistres (IBNR, triangles)
 - Données simulées, calibrées sur des hypothèses de marché documentées et ajustables
 
 **Hors périmètre (phases suivantes) :**
