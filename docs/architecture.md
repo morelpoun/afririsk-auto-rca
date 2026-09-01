@@ -18,6 +18,11 @@ backend/app/
   database/            persistance
     models.py             customers, vehicles, policies, claims, pricing_results
     session.py             SQLite (dev/tests) ou PostgreSQL (docker-compose)
+  ml/                  benchmarks (pas utilisés par /tarif en production)
+    tweedie.py             GLM Tweedie
+    xgboost_model.py        XGBoost (objectif Tweedie)
+    explain.py               explicabilité SHAP
+    comparison_results.json  résultat de la dernière comparaison, exposé par GET /models
 ```
 
 ## Principe directeur : le moteur actuariel est séparé de l'API
@@ -53,9 +58,18 @@ workflow de souscription complet — seul `pricing_results` est écrit à chaque
 cotation dans ce MVP. Le branchement d'un vrai parcours de souscription
 (création client → véhicule → police) est prévu en v0.2/v0.3.
 
+## Modèles benchmark (`ml/`, v0.2)
+
+`ml/tweedie.py` et `ml/xgboost_model.py` (+ `ml/explain.py` pour SHAP) ne sont
+**pas** importés par `main.py` : la comparaison se fait hors ligne via
+`scripts/compare_models.py`, qui écrit `ml/comparison_results.json`. L'API de
+production reste donc légère (pas besoin de `xgboost`/`shap` pour servir
+`/tarif`) ; `GET /models` se contente de lire ce fichier JSON s'il existe.
+Voir `docs/ml_methodology.md` pour la méthodologie et le résultat de
+référence.
+
 ## Ce qui n'est pas encore là (volontairement)
 
-- Modèles Tweedie / Machine Learning (XGBoost) et explicabilité SHAP
 - Bonus-malus
 - Authentification / RBAC
 - Migrations de schéma (Alembic) — pour l'instant `Base.metadata.create_all()`

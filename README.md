@@ -9,8 +9,10 @@ réglementaire configurable par pays, et une traçabilité complète de chaque
 cotation.
 
 Voir [`docs/cahier_des_charges.md`](docs/cahier_des_charges.md) (périmètre,
-hypothèses, feuille de route), [`docs/architecture.md`](docs/architecture.md)
-et [`docs/regulatory.md`](docs/regulatory.md) (couche réglementaire CIMA).
+hypothèses, feuille de route), [`docs/architecture.md`](docs/architecture.md),
+[`docs/regulatory.md`](docs/regulatory.md) (couche réglementaire CIMA) et
+[`docs/ml_methodology.md`](docs/ml_methodology.md) (comparaison GLM / Tweedie
+/ XGBoost+SHAP).
 
 ## Démarrage rapide avec Docker (recommandé)
 
@@ -78,6 +80,21 @@ cd backend && python -m scripts.calibrate
 Affiche les résumés statsmodels des GLM fréquence/sévérité et un exemple de
 tarification complet.
 
+## Comparer GLM, Tweedie et XGBoost+SHAP
+
+`/tarif` utilise uniquement le GLM fréquence×sévérité, choisi pour son
+interprétabilité. Deux benchmarks (GLM Tweedie, XGBoost+SHAP) sont comparés
+hors production — voir `docs/ml_methodology.md` pour la méthodologie et les
+résultats de référence :
+
+```bash
+cd backend
+pip install -r requirements-ml.txt   # xgboost, shap, scikit-learn — pas nécessaire pour l'API
+python -m scripts.compare_models
+```
+
+Écrit `backend/app/ml/comparison_results.json`, exposé par `GET /models`.
+
 ## Tests
 
 ```bash
@@ -91,7 +108,7 @@ cd backend && python -m pytest
 - ✅ Persistance PostgreSQL + traçabilité de chaque cotation
 - ✅ Couche réglementaire configurable (CIMA/RCA)
 - ✅ Interface de tarification et dashboard minimalistes
-- ⬜ Modèles Tweedie / ML (XGBoost) + explicabilité SHAP
+- ✅ Benchmarks Tweedie / XGBoost + SHAP comparés au GLM de production (v0.2)
 - ⬜ Bonus-malus, gestion des sinistres, KPI de rentabilité
 - ⬜ Calibration sur données réelles d'une compagnie RCA
 - ⬜ Extension multi-branches / multi-pays

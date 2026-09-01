@@ -1,0 +1,50 @@
+{
+  "generated_at": "2026-09-01T12:25:53.687813+00:00",
+  "portfolio_size": 15000,
+  "train_size": 10500,
+  "test_size": 4500,
+  "models": [
+    {
+      "model_id": "GLM_FREQ_SEV_V1",
+      "type": "GLM fréquence (Poisson) × sévérité (Gamma)",
+      "status": "production",
+      "interpretable": true,
+      "metrics": {
+        "rmse": 216128.3715429818,
+        "mae": 107784.09072726523,
+        "gini": 0.24480958846972004
+      }
+    },
+    {
+      "model_id": "TWEEDIE_GLM_V1",
+      "type": "GLM Tweedie (coût total direct)",
+      "status": "benchmark",
+      "interpretable": true,
+      "metrics": {
+        "rmse": 216263.03439897983,
+        "mae": 108380.35685357792,
+        "gini": 0.22977981623083502
+      }
+    },
+    {
+      "model_id": "XGBOOST_TWEEDIE_V1",
+      "type": "XGBoost (objectif Tweedie) + SHAP",
+      "status": "benchmark",
+      "interpretable": false,
+      "metrics": {
+        "rmse": 217340.8373491936,
+        "mae": 103050.91643444137,
+        "gini": 0.2313294395773835
+      },
+      "shap_global_importance": {
+        "age_conducteur": 0.14857131242752075,
+        "anciennete_permis": 0.19124479591846466,
+        "usage_pro": 0.07605759799480438,
+        "zone_bangui": 0.2217557430267334,
+        "puissance_cv": 0.1284635215997696,
+        "valeur_vehicule_fcfa": 0.21762031316757202,
+        "nb_sinistres_anterieurs": 0.11423336714506149
+      }
+    }
+  ]
+}

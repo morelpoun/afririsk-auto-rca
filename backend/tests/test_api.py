@@ -90,6 +90,22 @@ def test_tarif_is_persisted_to_pricing_results():
         db.close()
 
 
+def test_models_endpoint_reports_production_model():
+    with TestClient(app) as client:
+        response = client.get("/models")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["production_model"] == "GLM_FREQ_SEV_V1"
+    # La comparaison est un artefact généré par scripts/compare_models.py
+    # (nécessite requirements-ml.txt) ; si elle n'a pas été lancée, l'endpoint
+    # doit rester fonctionnel et l'indiquer clairement plutôt que planter.
+    if data["comparison_available"]:
+        model_ids = {m["model_id"] for m in data["models"]}
+        assert "GLM_FREQ_SEV_V1" in model_ids
+    else:
+        assert "message" in data
+
+
 def test_simulate_endpoint_returns_one_point_per_value():
     payload = {
         "contrat_base": BASE_CONTRACT,

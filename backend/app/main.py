@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -30,6 +31,7 @@ COUNTRY = "CF"
 PRODUCT = "AUTO_RC"
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+MODEL_COMPARISON_PATH = Path(__file__).resolve().parent / "ml" / "comparison_results.json"
 
 
 @asynccontextmanager
@@ -114,6 +116,34 @@ def simulate(payload: SimulationRequest, request: Request) -> SimulationResponse
         points.append(SimulationPoint(valeur=valeur, prime_commerciale=result.prime_commerciale))
 
     return SimulationResponse(parametre=payload.parametre, points=points)
+
+
+@app.get("/models")
+def list_models() -> dict:
+    """Registre léger des modèles disponibles (pas de MLflow en v0.2).
+
+    Le GLM fréquence×sévérité (`GLM_FREQ_SEV_V1`) est le seul modèle utilisé
+    par `/tarif` en production, pour rester pleinement interprétable et
+    auditable — voir docs/ml_methodology.md. Le Tweedie et le XGBoost+SHAP
+    sont des benchmarks de comparaison, produits par
+    `scripts/compare_models.py`, pas des modèles servis en production.
+    """
+    if not MODEL_COMPARISON_PATH.exists():
+        return {
+            "production_model": MODEL_VERSION,
+            "comparison_available": False,
+            "message": (
+                "Aucune comparaison enregistrée. Lancer "
+                "`cd backend && python -m scripts.compare_models` "
+                "(nécessite requirements-ml.txt) pour la générer."
+            ),
+        }
+    comparison = json.loads(MODEL_COMPARISON_PATH.read_text())
+    return {
+        "production_model": MODEL_VERSION,
+        "comparison_available": True,
+        **comparison,
+    }
 
 
 @app.get("/portfolio/metrics", response_model=PortfolioMetrics)

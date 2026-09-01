@@ -17,7 +17,7 @@ une prime commerciale, calculées par un moteur actuariel transparent et explica
 - Autres branches (santé, habitation, vie...)
 - Autres pays (l'architecture le permet — voir `docs/regulatory.md` — mais seule
   la RCA est configurée)
-- Bonus-malus, scoring fraude, modèles Tweedie/ML (XGBoost) + SHAP, MLflow
+- Bonus-malus, scoring fraude, MLflow (registre de modèles versionné)
 - Authentification/RBAC
 - Frontend React/Next.js aboutissant (le MVP a une interface statique minimale,
   voir §7)
@@ -76,7 +76,10 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
 3. ✅ Persistance PostgreSQL + traçabilité de chaque cotation
 4. ✅ Couche réglementaire configurable (CIMA/RCA)
 5. ✅ Interface de tarification et dashboard minimalistes
-6. ⬜ Modèles Tweedie / ML (XGBoost) + explicabilité SHAP, comparaison de modèles
+6. ✅ Modèles Tweedie / XGBoost + SHAP, comparaison de modèles (v0.2, voir
+   `docs/ml_methodology.md`) — le GLM fréquence×sévérité reste le modèle de
+   production ; les alternatives sont des benchmarks, pas encore justifiées
+   par un gain net sur données réelles
 7. ⬜ Bonus-malus, gestion des sinistres, KPI de rentabilité (loss/combined ratio)
 8. ⬜ Partenariat avec une compagnie RCA pour données réelles anonymisées et
    recalibration des modèles

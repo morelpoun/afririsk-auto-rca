@@ -1,0 +1,7 @@
+# Dépendances additionnelles pour l'entraînement/la comparaison de modèles
+# (scripts/compare_models.py). Non nécessaires pour faire tourner l'API en
+# production : celle-ci sert uniquement le GLM fréquence/sévérité.
+-r requirements.txt
+scikit-learn>=1.4
+xgboost>=2.0
+shap>=0.45
