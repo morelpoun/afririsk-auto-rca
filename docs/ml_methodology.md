@@ -38,16 +38,16 @@ XGBOOST_TWEEDIE_V1          260 738       117 641     0.219
 
 (Mis à jour en v0.5 après l'ajout du facteur taxi-moto à la branche auto,
 qui améliore le pouvoir de discrimination du portefeuille pour les trois
-modèles — mais davantage pour le GLM, cohérent avec le fait que la donnée
+modèles mais davantage pour le GLM, cohérent avec le fait que la donnée
 simulée reste générée par une relation log-linéaire.)
 
-Sur ce portefeuille **synthétique** (généré par une relation log-linéaire —
+Sur ce portefeuille **synthétique** (généré par une relation log-linéaire
 voir `backend/app/actuarial/data_simulation.py`), le GLM fréquence×sévérité
 est déjà compétitif, voire légèrement meilleur en Gini que les deux
 alternatives. C'est attendu : la donnée de calibration est elle-même
 générée par un modèle proche d'un GLM. Ce résultat ne dit donc rien sur ce
 qui se passerait sur des données réelles, où des effets non linéaires ou des
-interactions pourraient avantager XGBoost — c'est précisément pourquoi ce
+interactions pourraient avantager XGBoost c'est précisément pourquoi ce
 benchmark devra être rejoué dès que des données réelles seront disponibles
 (phase 4 du cahier des charges), avant de décider de changer de modèle de
 production.
@@ -57,7 +57,7 @@ production.
 Comme discuté dans le document de vision initial (comparaison de modèles,
 §22) : le meilleur modèle n'est pas automatiquement celui qui a la meilleure
 performance brute. L'interprétabilité, la stabilité et l'acceptabilité
-réglementaire comptent aussi — un XGBoost, même expliqué par SHAP, reste plus
+réglementaire comptent aussi un XGBoost, même expliqué par SHAP, reste plus
 difficile à justifier ligne par ligne face à un régulateur qu'un GLM dont
 chaque coefficient a un sens actuariel direct. Tant que cette analyse n'a pas
 été refaite sur données réelles avec un avantage net et robuste pour un
