@@ -15,7 +15,7 @@ versionnées et remplaçables sans toucher au calcul de prime.
 Depuis v0.4, l'API accepte un contrat pour n'importe lequel des 15 États
 membres de la CIMA (`GET /countries`). **Le moteur de risque
 (`ActuarialEngine`, fréquence/sévérité GLM) reste unique et partagé par tous
-ces pays** — il n'existe pas 15 modèles calibrés séparément.
+ces pays** il n'existe pas 15 modèles calibrés séparément.
 
 Ce n'est pas un raccourci technique paresseux : c'est le choix honnête compte
 tenu des données disponibles. Ce projet n'a **aucune donnée réelle** par pays
