@@ -1,11 +1,11 @@
-# AfriRisk — moteur de tarification actuarielle multi-branches CIMA
+# AfriRisk moteur de tarification actuarielle multi-branches CIMA
 
 Moteur de tarification actuarielle pour les 15 États membres de la CIMA,
 auto (y compris taxi-moto) et habitation (MRH). L'API calcule une prime pure
 et une prime commerciale à partir des caractéristiques d'un contrat, avec des
-modèles de fréquence (GLM Poisson) et de sévérité (GLM Gamma) — un moteur par
-branche — calibrés pour l'instant sur un portefeuille synthétique documenté
-et **partagé par tous les pays** (voir `docs/regulatory.md` — aucune donnée
+modèles de fréquence (GLM Poisson) et de sévérité (GLM Gamma) un moteur par
+branche calibrés pour l'instant sur un portefeuille synthétique documenté
+et **partagé par tous les pays** (voir `docs/regulatory.md` aucune donnée
 réelle ne permet encore de différencier le risque par pays), une couche
 réglementaire et une devise configurables par pays, et une traçabilité
 complète de chaque cotation.
@@ -80,7 +80,7 @@ et renvoie la prime commerciale à chaque point (courbe de sensibilité).
 
 ## Branche habitation (MRH)
 
-`POST /habitation/tarif` et `POST /habitation/simulate` — même principe que
+`POST /habitation/tarif` et `POST /habitation/simulate` même principe que
 l'auto, moteur de tarification séparé (voir `docs/habitation.md`). Pas
 encore de souscription de police ni de sinistres pour cette branche.
 
@@ -131,7 +131,7 @@ tarification complet.
 
 `/tarif` utilise uniquement le GLM fréquence×sévérité, choisi pour son
 interprétabilité. Deux benchmarks (GLM Tweedie, XGBoost+SHAP) sont comparés
-hors production — voir `docs/ml_methodology.md` pour la méthodologie et les
+hors production voir `docs/ml_methodology.md` pour la méthodologie et les
 résultats de référence :
 
 ```bash
@@ -157,13 +157,13 @@ cd backend && python -m pytest
 - ✅ Interface de tarification et dashboard minimalistes
 - ✅ Benchmarks Tweedie / XGBoost + SHAP comparés au GLM de production (v0.2)
 - ✅ Bonus-malus, souscription/sinistres, KPI de rentabilité réels (v0.3)
-- ✅ Extension aux 15 pays CIMA — réglementaire/devise par pays, modèle de
+- ✅ Extension aux 15 pays CIMA réglementaire/devise par pays, modèle de
   risque encore partagé (v0.4, voir `docs/regulatory.md`)
-- ✅ Taxi-moto (auto) et branche habitation MRH — moteur de tarification
+- ✅ Taxi-moto (auto) et branche habitation MRH moteur de tarification
   complet, pas encore souscription/sinistres (v0.5, voir `docs/habitation.md`)
 - ⬜ Authentification/RBAC, frontend React/Next.js complet, facturation SaaS
 - ⬜ Calibration du risque par pays sur données réelles
-- ⬜ Santé et vie (paradigmes actuariels différents de l'habitation — voir
+- ⬜ Santé et vie (paradigmes actuariels différents de l'habitation voir
   `docs/cahier_des_charges.md` §10)
 
 Voir le cahier des charges pour le détail des hypothèses et des jalons.
