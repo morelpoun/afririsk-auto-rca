@@ -1,11 +1,11 @@
-# Branche habitation (multirisque habitation / MRH) — v0.5
+# Branche habitation (multirisque habitation / MRH) v0.5
 
 ## Périmètre
 
 Deuxième branche d'assurance, après l'auto. Même architecture actuarielle
 (GLM fréquence Poisson + sévérité Gamma, décomposition explicative,
 chargements commerciaux, contrôle réglementaire par pays) appliquée à des
-facteurs de risque habitation plutôt qu'automobile — voir
+facteurs de risque habitation plutôt qu'automobile voir
 `backend/app/actuarial/habitation_pricing.py` et
 `habitation_data_simulation.py`.
 
