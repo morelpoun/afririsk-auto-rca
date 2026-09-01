@@ -1,4 +1,4 @@
-# Architecture — AfriRisk Auto RCA
+# Architecture — AfriRisk Auto (CIMA)
 
 ## Vue d'ensemble
 
@@ -15,7 +15,7 @@ backend/app/
     bonus_malus.py         grille de coefficient par défaut (non réglementaire)
   regulatory/          couche réglementaire configurable
     rules.py              modèle de règle + contrôle de tarif minimum
-    countries/cf.py        paramètres RCA (CIMA)
+    cima_countries.py       table des 15 pays CIMA (devise, zone monétaire)
   database/            persistance
     models.py             customers, vehicles, policies, claims, pricing_results
     session.py             SQLite (dev/tests) ou PostgreSQL (docker-compose)
@@ -38,10 +38,13 @@ inversement.
 
 ## Cycle de vie d'une cotation (`POST /tarif`)
 
-1. Validation du contrat entrant (`schemas.ContractInput`)
-2. `ActuarialEngine.price(...)` → fréquence, sévérité, prime pure, prime commerciale
-3. `regulatory.check_minimum_tariff(...)` → conformité au tarif minimum configuré
-   pour (pays, produit), s'il existe
+1. Validation du contrat entrant (`schemas.ContractInput`, avec `country` parmi
+   les 15 pays CIMA)
+2. `ActuarialEngine.price(...)` → fréquence, sévérité, prime pure, prime
+   commerciale (**identique quel que soit le pays** — voir docs/regulatory.md)
+3. `regulatory.check_minimum_tariff(contract.country, ...)` → conformité au
+   tarif minimum configuré pour ce pays, s'il existe ; `currency_for_country`
+   détermine la devise affichée
 4. Écriture d'une ligne dans `pricing_results` : entrées, sorties, version du
    modèle (`model_version`), version réglementaire appliquée — pour pouvoir
    reconstruire exactement un calcul passé

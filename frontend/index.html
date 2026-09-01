@@ -96,7 +96,7 @@
 <div class="wrap">
   <header>
     <h1>AfriRisk Auto — Nouvelle tarification</h1>
-    <p>MVP · République Centrafricaine · modèle calibré sur portefeuille synthétique</p>
+    <p>MVP · 15 pays CIMA · modèle de risque unique, calibré sur portefeuille synthétique (voir docs/regulatory.md)</p>
     <nav><a href="/app/dashboard.html">Voir le tableau de bord portefeuille →</a></nav>
   </header>
 
@@ -104,6 +104,11 @@
     <div class="panel">
       <h2>Contrat</h2>
       <form id="quote-form">
+        <label for="country">Pays</label>
+        <select id="country">
+          <option value="CF" selected>République Centrafricaine</option>
+        </select>
+
         <label for="age_conducteur">Âge du conducteur</label>
         <input type="number" id="age_conducteur" min="18" max="90" value="32" required />
 
@@ -118,15 +123,15 @@
 
         <label for="zone">Zone géographique</label>
         <select id="zone">
-          <option value="bangui" selected>Bangui</option>
-          <option value="province">Province</option>
+          <option value="urbain" selected>Urbaine (capitale / grande ville)</option>
+          <option value="rural">Rurale</option>
         </select>
 
         <label for="puissance_cv">Puissance fiscale (CV)</label>
         <input type="number" id="puissance_cv" min="1" max="60" value="9" required />
 
-        <label for="valeur_vehicule_fcfa">Valeur du véhicule (FCFA)</label>
-        <input type="number" id="valeur_vehicule_fcfa" min="1" step="1000" value="8500000" required />
+        <label for="valeur_vehicule_fcfa">Valeur du véhicule (<span id="currency-label">FCFA</span>)</label>
+        <input type="number" id="valeur_vehicule_fcfa" min="0" step="1000" value="8500000" required />
 
         <label for="garantie">Garantie</label>
         <select id="garantie">
@@ -157,8 +162,29 @@ const form = document.getElementById('quote-form');
 const resultEl = document.getElementById('result');
 const errorEl = document.getElementById('error');
 const submitBtn = document.getElementById('submit-btn');
+const countrySelect = document.getElementById('country');
+const currencyLabel = document.getElementById('currency-label');
 
 const fmt = (n) => Math.round(n).toLocaleString('fr-FR');
+
+let countryCurrencies = { CF: 'XAF' };
+
+fetch('/countries')
+  .then((res) => res.json())
+  .then((countries) => {
+    countryCurrencies = Object.fromEntries(countries.map((c) => [c.code, c.currency]));
+    countrySelect.innerHTML = countries
+      .map((c) => `<option value="${c.code}" ${c.code === 'CF' ? 'selected' : ''}>${c.name} (${c.currency})</option>`)
+      .join('');
+    currencyLabel.textContent = countryCurrencies[countrySelect.value] || 'FCFA';
+  })
+  .catch(() => {
+    // Le formulaire reste utilisable avec la RCA par défaut si /countries échoue.
+  });
+
+countrySelect.addEventListener('change', () => {
+  currencyLabel.textContent = countryCurrencies[countrySelect.value] || 'FCFA';
+});
 
 function contribRows(contributions) {
   return Object.entries(contributions)
@@ -179,6 +205,7 @@ form.addEventListener('submit', async (e) => {
   submitBtn.textContent = 'Calcul en cours…';
 
   const payload = {
+    country: countrySelect.value,
     age_conducteur: Number(document.getElementById('age_conducteur').value),
     anciennete_permis: Number(document.getElementById('anciennete_permis').value),
     usage: document.getElementById('usage').value,
@@ -203,17 +230,18 @@ form.addEventListener('submit', async (e) => {
 
     const badgeClass = data.regulatory_check.compliant ? 'ok' : 'warn';
     const badgeText = data.regulatory_check.compliant ? '✓ Conforme (contrôle réglementaire)' : '⚠ ' + data.regulatory_check.message;
+    const cur = data.currency;
 
     resultEl.innerHTML = `
       <div class="result-line"><span class="label">Fréquence estimée</span><span>${(data.frequence_estimee * 100).toFixed(1)} %</span></div>
-      <div class="result-line"><span class="label">Coût moyen estimé</span><span>${fmt(data.cout_moyen_estime)} FCFA</span></div>
-      <div class="result-line"><span class="label">Prime pure</span><span>${fmt(data.prime_pure)} FCFA</span></div>
-      <div class="result-line"><span class="label">Frais de gestion</span><span>${fmt(data.frais_gestion)} FCFA</span></div>
-      <div class="result-line"><span class="label">Marge technique</span><span>${fmt(data.marge_technique)} FCFA</span></div>
-      <div class="result-line"><span class="label">Taxes</span><span>${fmt(data.taxes)} FCFA</span></div>
+      <div class="result-line"><span class="label">Coût moyen estimé</span><span>${fmt(data.cout_moyen_estime)} ${cur}</span></div>
+      <div class="result-line"><span class="label">Prime pure</span><span>${fmt(data.prime_pure)} ${cur}</span></div>
+      <div class="result-line"><span class="label">Frais de gestion</span><span>${fmt(data.frais_gestion)} ${cur}</span></div>
+      <div class="result-line"><span class="label">Marge technique</span><span>${fmt(data.marge_technique)} ${cur}</span></div>
+      <div class="result-line"><span class="label">Taxes</span><span>${fmt(data.taxes)} ${cur}</span></div>
       <div class="total">
         <div class="amount-label">PRIME COMMERCIALE ANNUELLE</div>
-        <div class="amount">${fmt(data.prime_commerciale)} FCFA</div>
+        <div class="amount">${fmt(data.prime_commerciale)} ${cur}</div>
       </div>
       <span class="badge ${badgeClass}">${badgeText}</span>
       <div class="contrib">

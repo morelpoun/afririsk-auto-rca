@@ -1,9 +1,14 @@
-"""Génération d'un portefeuille auto synthétique pour la RCA.
+"""Génération d'un portefeuille auto synthétique.
 
 Les relations entre variables et sinistralité sont des hypothèses de
-démonstration (documentées ci-dessous), pas des statistiques de marché
-réelles. Elles servent à calibrer le moteur actuariel du MVP avant
-l'obtention de données réelles (cf. docs/cahier_des_charges.md, phase 4).
+démonstration (documentées ci-dessous, initialement établies pour la RCA),
+pas des statistiques de marché réelles. Faute de données réelles par pays,
+ce même modèle sert de base de calibration pour tous les pays CIMA — voir
+`app/regulatory/cima_countries.py` pour l'avertissement complet sur cette
+limite. `zone` est volontairement une classification générique
+urbain/rural (zone de la capitale ou d'une grande ville vs. reste du pays)
+plutôt qu'un nom de ville RCA-spécifique, pour rester applicable à n'importe
+quel pays CIMA.
 """
 from __future__ import annotations
 
@@ -16,14 +21,14 @@ CURRENT_YEAR = 2026
 BASE_LOG_FREQUENCY = -2.1
 EFFECT_JEUNE_CONDUCTEUR = 0.45  # < 25 ans
 EFFECT_USAGE_PROFESSIONNEL = 0.20
-EFFECT_ZONE_BANGUI = 0.25
+EFFECT_ZONE_URBAINE = 0.25
 EFFECT_SINISTRE_ANTERIEUR = 0.18  # par sinistre antérieur
 EFFECT_ANCIENNETE_PERMIS = -0.02  # par année d'ancienneté (plafonnée)
 
 # Hypothèses de coût moyen par sinistre (FCFA)
 BASE_SEVERITY = 120_000.0
 EFFECT_VALEUR_VEHICULE = 0.025  # part de la valeur assurée
-EFFECT_ZONE_BANGUI_SEVERITY = 60_000.0
+EFFECT_ZONE_URBAINE_SEVERITY = 60_000.0
 EFFECT_PUISSANCE_SEVERITY = 8_000.0  # par CV
 
 
@@ -38,7 +43,7 @@ def generate_portfolio(n: int = 15_000, seed: int = 42) -> pd.DataFrame:
     anciennete_permis = rng.integers(0, max_anciennete + 1)
 
     usage = rng.choice(["particulier", "professionnel"], size=n, p=[0.8, 0.2])
-    zone = rng.choice(["bangui", "province"], size=n, p=[0.6, 0.4])
+    zone = rng.choice(["urbain", "rural"], size=n, p=[0.6, 0.4])
     puissance_cv = rng.integers(4, 21, size=n)
     annee_vehicule = rng.integers(2000, CURRENT_YEAR, size=n)
     valeur_vehicule_fcfa = rng.lognormal(mean=15.8, sigma=0.5, size=n).round(-3)
@@ -51,14 +56,14 @@ def generate_portfolio(n: int = 15_000, seed: int = 42) -> pd.DataFrame:
 
     jeune = (age_conducteur < 25).astype(float)
     usage_pro = (usage == "professionnel").astype(float)
-    zone_bangui = (zone == "bangui").astype(float)
+    zone_urbain = (zone == "urbain").astype(float)
     anciennete_plafonnee = np.minimum(anciennete_permis, 20)
 
     log_lambda = (
         BASE_LOG_FREQUENCY
         + EFFECT_JEUNE_CONDUCTEUR * jeune
         + EFFECT_USAGE_PROFESSIONNEL * usage_pro
-        + EFFECT_ZONE_BANGUI * zone_bangui
+        + EFFECT_ZONE_URBAINE * zone_urbain
         + EFFECT_SINISTRE_ANTERIEUR * nb_sinistres_anterieurs
         + EFFECT_ANCIENNETE_PERMIS * anciennete_plafonnee
     )
@@ -68,7 +73,7 @@ def generate_portfolio(n: int = 15_000, seed: int = 42) -> pd.DataFrame:
     mean_cost = (
         BASE_SEVERITY
         + EFFECT_VALEUR_VEHICULE * valeur_vehicule_fcfa
-        + EFFECT_ZONE_BANGUI_SEVERITY * zone_bangui
+        + EFFECT_ZONE_URBAINE_SEVERITY * zone_urbain
         + EFFECT_PUISSANCE_SEVERITY * puissance_cv
     )
     # Gamma(shape=2) borné positif, moyenne = mean_cost

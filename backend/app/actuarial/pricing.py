@@ -1,5 +1,9 @@
 """Moteur actuariel : fréquence (GLM Poisson), sévérité (GLM Gamma) et
 calcul de prime pure / prime commerciale, avec décomposition explicative.
+
+Modèle de risque unique, partagé par tous les pays CIMA supportés (voir
+app/regulatory/cima_countries.py pour l'avertissement sur cette limite) —
+seule la couche réglementaire varie par pays, pas ce moteur.
 """
 from __future__ import annotations
 
@@ -12,14 +16,18 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
 FREQUENCY_FORMULA = (
-    "nb_sinistres ~ jeune + usage_pro + zone_bangui "
+    "nb_sinistres ~ jeune + usage_pro + zone_urbain "
     "+ nb_sinistres_anterieurs + anciennete_plafonnee"
 )
-SEVERITY_FORMULA = "cout_moyen_sinistre ~ valeur_vehicule_fcfa + zone_bangui + puissance_cv"
+SEVERITY_FORMULA = "cout_moyen_sinistre ~ valeur_vehicule_fcfa + zone_urbain + puissance_cv"
 
 # Chargements commerciaux — hypothèses de démonstration, à valider selon la
-# réglementation CIMA et la politique tarifaire de la compagnie.
-FRAIS_GESTION_FCFA = 8_000.0
+# réglementation CIMA et la politique tarifaire de la compagnie. Montant fixe
+# exprimé dans la devise du contrat (voir PricingResponse.currency) : faute
+# de données réelles de change/inflation par pays, ce même montant numérique
+# est utilisé quelle que soit la devise (XAF, XOF ou KMF) — simplification à
+# corriger dès qu'une vraie politique de frais par pays sera définie.
+FRAIS_GESTION = 8_000.0
 MARGE_TECHNIQUE = 0.12
 TAUX_TAXE = 0.20
 
@@ -39,7 +47,7 @@ def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["jeune"] = (df["age_conducteur"] < 25).astype(float)
     df["usage_pro"] = (df["usage"] == "professionnel").astype(float)
-    df["zone_bangui"] = (df["zone"] == "bangui").astype(float)
+    df["zone_urbain"] = (df["zone"] == "urbain").astype(float)
     df["anciennete_plafonnee"] = df["anciennete_permis"].clip(upper=20).astype(float)
     return df
 
@@ -111,7 +119,7 @@ class ActuarialEngine:
             family=sm.families.Poisson(),
             offset=np.log(df["exposition"]),
         ).fit()
-        freq_vars = ["jeune", "usage_pro", "zone_bangui", "nb_sinistres_anterieurs", "anciennete_plafonnee"]
+        freq_vars = ["jeune", "usage_pro", "zone_urbain", "nb_sinistres_anterieurs", "anciennete_plafonnee"]
         self.freq_means = {v: float(df[v].mean()) for v in freq_vars}
 
         sev_df = df[df["nb_sinistres"] > 0]
@@ -120,7 +128,7 @@ class ActuarialEngine:
             data=sev_df,
             family=sm.families.Gamma(link=sm.families.links.Log()),
         ).fit()
-        sev_vars = ["valeur_vehicule_fcfa", "zone_bangui", "puissance_cv"]
+        sev_vars = ["valeur_vehicule_fcfa", "zone_urbain", "puissance_cv"]
         self.sev_means = {v: float(sev_df[v].mean()) for v in sev_vars}
 
     def _fitted(self) -> bool:
@@ -133,7 +141,7 @@ class ActuarialEngine:
         x = {
             "jeune": 1.0 if contract["age_conducteur"] < 25 else 0.0,
             "usage_pro": 1.0 if contract["usage"] == "professionnel" else 0.0,
-            "zone_bangui": 1.0 if contract["zone"] == "bangui" else 0.0,
+            "zone_urbain": 1.0 if contract["zone"] == "urbain" else 0.0,
             "nb_sinistres_anterieurs": float(contract["nb_sinistres_anterieurs"]),
             "anciennete_plafonnee": min(float(contract["anciennete_permis"]), 20.0),
             "valeur_vehicule_fcfa": float(contract["valeur_vehicule_fcfa"]),
@@ -152,14 +160,14 @@ class ActuarialEngine:
         coefficient_bonus_malus = float(contract.get("coefficient_bonus_malus", 1.0))
 
         prime_pure = frequence * cout_moyen * loading * coefficient_bonus_malus
-        prime_nette = prime_pure * (1 + MARGE_TECHNIQUE) + FRAIS_GESTION_FCFA
+        prime_nette = prime_pure * (1 + MARGE_TECHNIQUE) + FRAIS_GESTION
         prime_commerciale = prime_nette * (1 + TAUX_TAXE)
 
         return PricingResult(
             frequence_estimee=frequence,
             cout_moyen_estime=cout_moyen,
             prime_pure=prime_pure,
-            frais_gestion=FRAIS_GESTION_FCFA,
+            frais_gestion=FRAIS_GESTION,
             marge_technique=prime_pure * MARGE_TECHNIQUE,
             taxes=prime_commerciale - prime_nette,
             prime_commerciale=prime_commerciale,

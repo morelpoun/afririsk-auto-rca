@@ -5,19 +5,29 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
+from app.regulatory.cima_countries import CimaCountryCode
+
 Usage = Literal["particulier", "professionnel"]
-Zone = Literal["bangui", "province"]
+Zone = Literal["urbain", "rural"]
 Garantie = Literal["tiers_simple", "tiers_etendu", "tous_risques"]
 Gender = Literal["M", "F"]
 
 
 class ContractInput(BaseModel):
+    country: CimaCountryCode = Field(
+        CimaCountryCode.CF,
+        description=(
+            "Pays CIMA du contrat. Le modèle de risque reste identique pour tous les "
+            "pays (voir docs/regulatory.md) ; seuls le contrôle réglementaire et la "
+            "devise en dépendent."
+        ),
+    )
     age_conducteur: int = Field(..., ge=18, le=90, description="Âge du conducteur principal")
     anciennete_permis: int = Field(..., ge=0, le=72, description="Ancienneté du permis en années")
     usage: Usage = "particulier"
-    zone: Zone = "bangui"
+    zone: Zone = Field("urbain", description="Zone de la capitale/grande ville, ou zone rurale")
     puissance_cv: int = Field(..., ge=1, le=60, description="Puissance fiscale du véhicule (CV)")
-    valeur_vehicule_fcfa: float = Field(..., gt=0, description="Valeur assurée du véhicule (FCFA)")
+    valeur_vehicule_fcfa: float = Field(..., gt=0, description="Valeur assurée du véhicule (devise du pays)")
     garantie: Garantie = "tiers_simple"
     nb_sinistres_anterieurs: int = Field(0, ge=0, le=20)
     coefficient_bonus_malus: float = Field(
@@ -45,6 +55,7 @@ class PricingResponse(BaseModel):
     frequence_moyenne_portefeuille: float
     cout_moyen_portefeuille: float
     model_version: str
+    currency: str
     regulatory_check: RegulatoryCheck
     pricing_result_id: int | None = None
 
@@ -88,6 +99,10 @@ class PortfolioKPIs(BaseModel):
     loss_ratio: float | None
     expense_ratio: float | None
     combined_ratio: float | None
+    currencies: list[str] = Field(
+        default_factory=list,
+        description="Devises effectivement incluses dans l'agrégat — plusieurs valeurs signalent un mélange de devises",
+    )
 
 
 class BonusMalusRequest(BaseModel):
@@ -109,7 +124,7 @@ class CustomerInput(BaseModel):
     gender: Gender
     profession: str | None = None
     city: str | None = None
-    country: str = "CF"
+    country: CimaCountryCode = CimaCountryCode.CF
 
 
 class VehicleInput(BaseModel):
@@ -141,11 +156,19 @@ class PolicyResponse(BaseModel):
     coverage: str
     deductible: float
     premium: float
+    currency: str
     status: str
     pricing_result_id: int | None = None
     regulatory_check: RegulatoryCheck
 
     model_config = {"from_attributes": True}
+
+
+class CimaCountryResponse(BaseModel):
+    code: CimaCountryCode
+    name: str
+    currency: str
+    zone_monetaire: str
 
 
 class ClaimInput(BaseModel):

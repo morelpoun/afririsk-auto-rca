@@ -5,10 +5,11 @@ from app.database.session import SessionLocal
 from app.main import app
 
 BASE_CONTRACT = {
+    "country": "CF",
     "age_conducteur": 35,
     "anciennete_permis": 15,
     "usage": "particulier",
-    "zone": "province",
+    "zone": "rural",
     "puissance_cv": 8,
     "valeur_vehicule_fcfa": 6_000_000,
     "garantie": "tiers_simple",
@@ -36,12 +37,13 @@ def test_tarif_returns_coherent_pricing():
     assert set(data["frequence_contributions"]) == {
         "jeune",
         "usage_pro",
-        "zone_bangui",
+        "zone_urbain",
         "nb_sinistres_anterieurs",
         "anciennete_plafonnee",
     }
     assert data["model_version"] == "GLM_FREQ_SEV_V1"
     assert data["pricing_result_id"] is not None
+    assert data["currency"] == "XAF"
     # Aucun tarif minimum CIMA/RCA n'est encore configuré (valeur non validée) :
     # le contrôle réglementaire doit donc rester non bloquant pour l'instant.
     assert data["regulatory_check"]["compliant"] is True
@@ -106,6 +108,40 @@ def test_models_endpoint_reports_production_model():
         assert "message" in data
 
 
+def test_countries_endpoint_lists_15_cima_members():
+    with TestClient(app) as client:
+        response = client.get("/countries")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 15
+    codes = {c["code"] for c in data}
+    assert {"CF", "CM", "GA", "CG", "SN", "CI"} <= codes
+    cf = next(c for c in data if c["code"] == "CF")
+    assert cf["currency"] == "XAF"
+
+
+def test_tarif_uses_currency_and_regulatory_rule_of_contract_country():
+    senegal_contract = dict(BASE_CONTRACT, country="SN")
+    with TestClient(app) as client:
+        response = client.post("/tarif", json=senegal_contract)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["currency"] == "XOF"
+    assert data["regulatory_check"]["regulatory_version"] is not None
+
+
+def test_same_contract_prices_identically_regardless_of_country():
+    # Le modèle de risque est unique et partagé par tous les pays CIMA
+    # (voir docs/regulatory.md) : seuls la devise et le contrôle
+    # réglementaire doivent varier avec le pays, pas la prime elle-même.
+    with TestClient(app) as client:
+        cf_result = client.post("/tarif", json=dict(BASE_CONTRACT, country="CF")).json()
+        cm_result = client.post("/tarif", json=dict(BASE_CONTRACT, country="CM")).json()
+
+    assert cf_result["prime_commerciale"] == cm_result["prime_commerciale"]
+    assert cf_result["currency"] == cm_result["currency"] == "XAF"  # CF et CM partagent la zone CEMAC
+
+
 def test_bonus_malus_coefficient_reduces_premium():
     with TestClient(app) as client:
         neutral = client.post("/tarif", json=BASE_CONTRACT).json()
@@ -158,6 +194,7 @@ def test_policy_subscription_and_claim_flow():
         assert policy_response.status_code == 200
         policy = policy_response.json()
         assert policy["premium"] > 0
+        assert policy["currency"] == "XAF"
         assert policy["pricing_result_id"] is not None
         assert policy["regulatory_check"]["compliant"] is True
 
@@ -186,6 +223,14 @@ def test_policy_subscription_and_claim_flow():
         assert kpis["nombre_polices"] >= 1
         assert kpis["sinistres_totaux"] >= 150_000
         assert kpis["loss_ratio"] is not None
+        assert kpis["currencies"] == ["XAF"]
+
+        kpis_cf_only = client.get("/portfolio/kpis?country=CF").json()
+        assert kpis_cf_only["nombre_polices"] >= 1
+
+        kpis_other_country = client.get("/portfolio/kpis?country=SN").json()
+        assert kpis_other_country["nombre_polices"] == 0
+        assert kpis_other_country["currencies"] == []
 
 
 def test_claim_on_unknown_policy_returns_404():

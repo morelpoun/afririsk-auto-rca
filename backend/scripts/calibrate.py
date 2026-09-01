@@ -26,7 +26,7 @@ def main() -> None:
         "age_conducteur": 22,
         "anciennete_permis": 3,
         "usage": "professionnel",
-        "zone": "bangui",
+        "zone": "urbain",
         "puissance_cv": 10,
         "valeur_vehicule_fcfa": 12_000_000,
         "garantie": "tous_risques",

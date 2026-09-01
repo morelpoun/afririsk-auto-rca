@@ -36,6 +36,14 @@ combined_ratio = loss_ratio + expense_ratio
 Renvoie `None` pour les trois ratios tant qu'aucune police n'a été souscrite
 (pas de division par zéro silencieuse).
 
+**Attention aux devises (depuis v0.4, multi-pays) :** sans le paramètre
+`?country=`, l'agrégat porte sur toutes les polices, quel que soit leur pays
+— additionner des primes en XAF et en XOF n'a de sens que parce que ces deux
+devises sont à parité fixe avec l'EUR ; ce ne serait plus vrai avec le KMF
+(Comores). Le champ `currencies` de la réponse liste les devises réellement
+incluses : si plusieurs pays ont des polices, préférer filtrer avec
+`?country=CF` (ou tout autre code CIMA) pour un total dans une seule devise.
+
 ## Peupler des données de démonstration
 
 ```bash

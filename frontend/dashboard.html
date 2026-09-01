@@ -107,14 +107,18 @@ fetch('/portfolio/kpis')
         '<div class="placeholder">Aucune police souscrite pour l\'instant.</div>';
       return;
     }
+    const cur = data.currencies.length === 1 ? data.currencies[0] : 'devises mélangées';
+    const mixedWarning = data.currencies.length > 1
+      ? `<p class="note" style="color:#f59e0b;margin-top:0.75rem">⚠ Polices dans plusieurs devises (${data.currencies.join(', ')}) — filtrer avec ?country= pour un total fiable dans une seule devise.</p>`
+      : '';
     document.getElementById('kpi-cards').innerHTML = `
       <div class="card"><div class="label">Polices</div><div class="value">${fmt(data.nombre_polices)}</div></div>
-      <div class="card"><div class="label">Primes totales</div><div class="value">${fmt(data.primes_totales)} FCFA</div></div>
-      <div class="card"><div class="label">Sinistres totaux</div><div class="value">${fmt(data.sinistres_totaux)} FCFA</div></div>
+      <div class="card"><div class="label">Primes totales</div><div class="value">${fmt(data.primes_totales)} ${cur}</div></div>
+      <div class="card"><div class="label">Sinistres totaux</div><div class="value">${fmt(data.sinistres_totaux)} ${cur}</div></div>
       <div class="card"><div class="label">Loss ratio</div><div class="value ${ratioClass(data.loss_ratio)}">${pct(data.loss_ratio)}</div></div>
       <div class="card"><div class="label">Expense ratio</div><div class="value">${pct(data.expense_ratio)}</div></div>
       <div class="card"><div class="label">Combined ratio</div><div class="value ${ratioClass(data.combined_ratio)}">${pct(data.combined_ratio)}</div></div>
-    `;
+    ` + mixedWarning;
   })
   .catch(() => {
     document.getElementById('kpi-cards').innerHTML = '<div class="placeholder">Impossible de charger les KPI.</div>';

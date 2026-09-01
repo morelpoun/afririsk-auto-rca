@@ -11,7 +11,7 @@ FEATURES = [
     "age_conducteur",
     "anciennete_permis",
     "usage_pro",
-    "zone_bangui",
+    "zone_urbain",
     "puissance_cv",
     "valeur_vehicule_fcfa",
     "nb_sinistres_anterieurs",

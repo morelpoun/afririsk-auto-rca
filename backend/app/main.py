@@ -13,11 +13,18 @@ from app.actuarial.data_simulation import generate_portfolio
 from app.actuarial.pricing import ActuarialEngine
 from app.database import crud
 from app.database.session import get_db, init_db
-from app.regulatory.countries import cf as cf_rules
+from app.regulatory.cima_countries import (
+    CIMA_COUNTRIES,
+    PRODUCT_AUTO_RC,
+    CimaCountryCode,
+    currency_for_country,
+    load_all_regulatory_rules,
+)
 from app.regulatory.rules import check_minimum_tariff
 from app.schemas import (
     BonusMalusRequest,
     BonusMalusResponse,
+    CimaCountryResponse,
     ClaimInput,
     ClaimResponse,
     ContractInput,
@@ -35,8 +42,7 @@ from app.schemas import (
 PORTFOLIO_SIZE = 15_000
 PORTFOLIO_SEED = 42
 MODEL_VERSION = "GLM_FREQ_SEV_V1"
-COUNTRY = "CF"
-PRODUCT = "AUTO_RC"
+PRODUCT = PRODUCT_AUTO_RC
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 MODEL_COMPARISON_PATH = Path(__file__).resolve().parent / "ml" / "comparison_results.json"
@@ -45,7 +51,7 @@ MODEL_COMPARISON_PATH = Path(__file__).resolve().parent / "ml" / "comparison_res
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    cf_rules.load()
+    load_all_regulatory_rules()
 
     portfolio = generate_portfolio(n=PORTFOLIO_SIZE, seed=PORTFOLIO_SEED)
     engine = ActuarialEngine()
@@ -56,13 +62,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AfriRisk Auto — moteur de tarification actuarielle RCA",
+    title="AfriRisk Auto — moteur de tarification actuarielle CIMA",
     description=(
-        "API de tarification automobile pour le marché centrafricain "
-        "(espace CIMA), calibrée sur un portefeuille synthétique "
-        "(voir docs/cahier_des_charges.md)."
+        "API de tarification automobile pour les 15 États membres de la CIMA, "
+        "calibrée sur un portefeuille synthétique unique (voir "
+        "docs/cahier_des_charges.md et docs/regulatory.md)."
     ),
-    version="0.1.0",
+    version="0.4.0",
     lifespan=lifespan,
 )
 
@@ -80,7 +86,7 @@ def tarif(contract: ContractInput, request: Request, db: Session = Depends(get_d
     engine: ActuarialEngine = request.app.state.engine
     result = engine.price(contract.model_dump())
 
-    reg_check = check_minimum_tariff(COUNTRY, PRODUCT, result.prime_commerciale)
+    reg_check = check_minimum_tariff(contract.country.value, PRODUCT, result.prime_commerciale)
 
     row = crud.record_pricing_result(
         db,
@@ -101,6 +107,7 @@ def tarif(contract: ContractInput, request: Request, db: Session = Depends(get_d
     return PricingResponse(
         **result.__dict__,
         model_version=MODEL_VERSION,
+        currency=currency_for_country(contract.country),
         regulatory_check=RegulatoryCheck(
             compliant=reg_check.compliant,
             regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
@@ -118,6 +125,21 @@ def bonus_malus_compute(payload: BonusMalusRequest) -> BonusMalusResponse:
         classe_indicative=result.classe_indicative,
         avertissement=result.avertissement,
     )
+
+
+@app.get("/countries", response_model=list[CimaCountryResponse])
+def list_countries() -> list[CimaCountryResponse]:
+    """Pays CIMA supportés (code, devise, zone monétaire) — pour peupler un
+    sélecteur pays côté frontend. Le moteur de risque est identique pour
+    tous (voir docs/regulatory.md) ; seuls le contrôle réglementaire et la
+    devise varient par pays.
+    """
+    return [
+        CimaCountryResponse(
+            code=c.code, name=c.name, currency=c.currency, zone_monetaire=c.zone_monetaire
+        )
+        for c in CIMA_COUNTRIES
+    ]
 
 
 @app.post("/simulate", response_model=SimulationResponse)
@@ -146,7 +168,7 @@ def subscribe_policy(
     """
     engine: ActuarialEngine = request.app.state.engine
     result = engine.price(payload.contract.model_dump())
-    reg_check = check_minimum_tariff(COUNTRY, PRODUCT, result.prime_commerciale)
+    reg_check = check_minimum_tariff(payload.contract.country.value, PRODUCT, result.prime_commerciale)
 
     customer = crud.create_customer(db, payload.customer.model_dump())
     vehicle = crud.create_vehicle(db, customer.id, payload.vehicle.model_dump())
@@ -192,6 +214,7 @@ def subscribe_policy(
         coverage=policy.coverage,
         deductible=policy.deductible,
         premium=policy.premium,
+        currency=currency_for_country(payload.contract.country),
         status=policy.status,
         pricing_result_id=pricing_row.id,
         regulatory_check=RegulatoryCheck(
@@ -211,7 +234,8 @@ def get_policies(
 
     responses = []
     for p in policies:
-        reg_check = check_minimum_tariff(COUNTRY, PRODUCT, p.premium)
+        country = p.customer.country
+        reg_check = check_minimum_tariff(country, PRODUCT, p.premium)
         responses.append(
             PolicyResponse(
                 id=p.id,
@@ -223,6 +247,7 @@ def get_policies(
                 coverage=p.coverage,
                 deductible=p.deductible,
                 premium=p.premium,
+                currency=currency_for_country(country),
                 status=p.status,
                 pricing_result_id=pricing_result_ids.get(p.id),
                 regulatory_check=RegulatoryCheck(
@@ -303,12 +328,20 @@ def portfolio_metrics(request: Request) -> PortfolioMetrics:
 
 
 @app.get("/portfolio/kpis", response_model=PortfolioKPIs)
-def portfolio_kpis(db: Session = Depends(get_db)) -> PortfolioKPIs:
+def portfolio_kpis(
+    country: CimaCountryCode | None = Query(
+        None, description="Filtrer sur un pays — recommandé dès que plusieurs pays ont des polices, pour ne pas mélanger les devises."
+    ),
+    db: Session = Depends(get_db),
+) -> PortfolioKPIs:
     """KPI de rentabilité (loss/expense/combined ratio) calculés sur les
     polices et sinistres réellement persistés — distinct de
     `/portfolio/metrics`, qui reste basé sur le portefeuille synthétique de
     calibration. `None` tant qu'aucune police n'a été souscrite via
     `POST /policies` (voir scripts/seed_database.py pour peupler des
-    données de démonstration).
+    données de démonstration). Le champ `currencies` de la réponse liste les
+    devises incluses dans l'agrégat — plusieurs valeurs signalent un mélange
+    de devises si `country` n'est pas précisé.
     """
-    return PortfolioKPIs(**crud.portfolio_kpis(db))
+    country_value = country.value if country else None
+    return PortfolioKPIs(**crud.portfolio_kpis(db, country=country_value))

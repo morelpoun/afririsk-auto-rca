@@ -1,15 +1,19 @@
-# Cahier des charges — MVP "AfriRisk Auto" (tarification auto RCA)
+# Cahier des charges — "AfriRisk Auto" (tarification auto CIMA)
 
 ## 1. Objectif
-Fournir un outil permettant à un assureur ou courtier centrafricain de saisir les
-caractéristiques d'un contrat auto et d'obtenir instantanément une prime pure et
-une prime commerciale, calculées par un moteur actuariel transparent et explicable.
+Fournir un outil permettant à un assureur ou courtier des 15 États membres de
+la CIMA de saisir les caractéristiques d'un contrat auto et d'obtenir
+instantanément une prime pure et une prime commerciale, calculées par un
+moteur actuariel transparent et explicable.
 
-## 2. Périmètre du MVP
+## 2. Périmètre
 
 **Dans le périmètre :**
 - Une seule branche : assurance automobile particulière (hors flottes, hors taxis)
-- Un seul pays : République Centrafricaine (RCA)
+- Les 15 États membres de la CIMA, avec **un seul modèle de risque partagé**
+  (voir `docs/regulatory.md`) — seuls la devise et le contrôle réglementaire
+  varient par pays, pas encore le risque lui-même faute de données réelles
+  par marché
 - Calcul de prime à la souscription, souscription de polices, déclaration de
   sinistres et KPI de rentabilité (loss/expense/combined ratio) — pas de
   provisionnement actuariel des sinistres (IBNR, triangles)
@@ -17,24 +21,26 @@ une prime commerciale, calculées par un moteur actuariel transparent et explica
 
 **Hors périmètre (phases suivantes) :**
 - Autres branches (santé, habitation, vie...)
-- Autres pays (l'architecture le permet — voir `docs/regulatory.md` — mais seule
-  la RCA est configurée)
+- Calibration du risque par pays sur données réelles (voir `docs/regulatory.md`)
 - Scoring fraude, provisionnement (IBNR), MLflow (registre de modèles versionné)
 - Authentification/RBAC
 - Frontend React/Next.js aboutissant (le MVP a une interface statique minimale,
   voir §7)
 - Données réelles compagnie (phase 4)
+- Facturation SaaS avec encaissement réel (prestataire de paiement à choisir)
 
 ## 3. Utilisateur cible
 Chargé de tarification / souscripteur dans une compagnie ou un courtier. L'API est
 conçue pour être appelée par une interface simple, sans connaissances en data
 science requises côté utilisateur final.
 
-## 4. Variables d'entrée (v1)
+## 4. Variables d'entrée
+- Pays : un des 15 États membres CIMA (`GET /countries`)
 - Conducteur : âge, sexe, ancienneté du permis
-- Véhicule : puissance (CV), année de mise en circulation, valeur assurée (FCFA)
-- Contexte : zone géographique (Bangui / province), usage (particulier / professionnel),
-  nombre d'années assuré, nombre de sinistres antérieurs
+- Véhicule : puissance (CV), année de mise en circulation, valeur assurée
+  (devise du pays sélectionné)
+- Contexte : zone urbaine (capitale/grande ville) ou rurale, usage (particulier
+  / professionnel), nombre d'années assuré, nombre de sinistres antérieurs
 - Garantie : tiers simple / tiers étendu / tous risques
 
 ## 5. Moteur actuariel
@@ -66,8 +72,9 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
   (entrées, modèle, version réglementaire) pour pouvoir reconstruire un calcul
   passé — voir `docs/architecture.md`
 - Réglementaire : couche `regulatory/` configurable par (pays, produit), voir
-  `docs/regulatory.md` — le tarif minimum CIMA/RCA n'est pas codé en dur tant
-  qu'il n'a pas été obtenu et validé auprès du régulateur
+  `docs/regulatory.md` — table des 15 pays CIMA (`cima_countries.py`), tarif
+  minimum non codé en dur tant qu'il n'a pas été obtenu et validé auprès du
+  régulateur, pour aucun pays
 - Frontend : interface statique minimale (`frontend/index.html` formulaire de
   cotation, `frontend/dashboard.html` KPI portefeuille), servie par FastAPI en
   HTML/JS vanilla — un frontend React/Next.js plus riche reste une évolution
@@ -89,11 +96,19 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
    loss/expense/combined ratio (`GET /portfolio/kpis`)
 8. ⬜ Partenariat avec une compagnie RCA pour données réelles anonymisées et
    recalibration des modèles
-9. ⬜ Extension multi-branches / multi-pays (Cameroun, Gabon, ...)
+9. ✅ Extension sous-régionale aux 15 pays CIMA (v0.4, voir `docs/regulatory.md`)
+   — réglementaire et devise par pays ; modèle de risque encore partagé,
+   calibration par pays hors périmètre tant que des données réelles ne sont
+   pas disponibles
 10. ⬜ Authentification/RBAC, frontend React/Next.js complet, facturation SaaS
+11. ⬜ Extension multi-branches (santé, habitation, vie...)
 
 ## 9. Risques principaux
 - Sans données réelles, le modèle reste démonstratif — une mise en production
   nécessite une calibration sur les données d'une vraie compagnie
-- Cadre réglementaire assurance RCA (CIMA) à valider pour les chargements et taxes
-- Disponibilité de référentiels véhicules/zones RCA fiables
+- Le même modèle de risque est utilisé pour les 15 pays CIMA (voir
+  `docs/regulatory.md`) : ne jamais présenter une prime calculée hors RCA
+  comme calibrée sur le marché réel de ce pays
+- Cadre réglementaire CIMA à valider pays par pays pour les tarifs minimums,
+  chargements et taxes
+- Disponibilité de référentiels véhicules/zones fiables par pays

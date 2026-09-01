@@ -17,7 +17,7 @@ from app.actuarial.data_simulation import generate_portfolio
 from app.actuarial.pricing import ActuarialEngine
 from app.database import crud
 from app.database.session import SessionLocal, init_db
-from app.regulatory.countries import cf as cf_rules
+from app.regulatory.cima_countries import load_all_regulatory_rules
 from app.regulatory.rules import check_minimum_tariff
 
 VEHICLES = [
@@ -38,7 +38,7 @@ TODAY = date(2026, 9, 1)
 
 def seed(n: int, seed_value: int = 123) -> None:
     init_db()
-    cf_rules.load()
+    load_all_regulatory_rules()
 
     calibration_portfolio = generate_portfolio(n=15_000, seed=42)
     engine = ActuarialEngine()
@@ -75,8 +75,8 @@ def seed(n: int, seed_value: int = 123) -> None:
                     "birth_date": birth_date,
                     "gender": row["sexe"],
                     "profession": "professionnel" if row["usage"] == "professionnel" else None,
-                    "city": "Bangui" if row["zone"] == "bangui" else "Province",
-                    "country": "CF",
+                    "city": "Capitale" if row["zone"] == "urbain" else "Province",
+                    "country": COUNTRY,
                 },
             )
 

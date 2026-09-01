@@ -4,9 +4,10 @@ sinistres. Séparé de main.py pour garder les routes fines et testables.
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import models
+from app.regulatory.cima_countries import currency_for_country
 
 
 def create_customer(db: Session, data: dict) -> models.Customer:
@@ -107,10 +108,24 @@ def list_claims(db: Session, policy_id: int | None = None, limit: int = 50, offs
     return list(db.scalars(stmt))
 
 
-def portfolio_kpis(db: Session) -> dict:
-    policies = list(db.scalars(select(models.Policy)))
+def portfolio_kpis(db: Session, country: str | None = None) -> dict:
+    """Agrège les KPI de rentabilité.
+
+    Sans `country`, agrège toutes les polices — dangereux si elles ne sont
+    pas toutes dans la même devise (additionner XAF et XOF n'a pas de sens
+    comptable même si les deux sont à parité fixe avec l'EUR). Le champ
+    `currencies` du résultat liste les devises effectivement incluses pour
+    que l'appelant puisse détecter un mélange plutôt que de faire confiance
+    silencieusement à un total agrégé.
+    """
+    stmt = select(models.Policy).options(joinedload(models.Policy.customer))
+    if country is not None:
+        stmt = stmt.join(models.Customer).where(models.Customer.country == country)
+    policies = list(db.scalars(stmt).unique())
+
     nombre_polices = len(policies)
     primes_totales = sum(p.premium for p in policies)
+    currencies = sorted({currency_for_country(p.customer.country) for p in policies})
 
     policy_ids = [p.id for p in policies]
     sinistres_totaux = 0.0
@@ -138,4 +153,5 @@ def portfolio_kpis(db: Session) -> dict:
         "loss_ratio": loss_ratio,
         "expense_ratio": expense_ratio,
         "combined_ratio": combined_ratio,
+        "currencies": currencies,
     }

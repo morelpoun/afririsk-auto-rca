@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-01T12:25:53.687813+00:00",
+  "generated_at": "2026-09-01T13:23:49.427705+00:00",
   "portfolio_size": 15000,
   "train_size": 10500,
   "test_size": 4500,
@@ -40,7 +40,7 @@
         "age_conducteur": 0.14857131242752075,
         "anciennete_permis": 0.19124479591846466,
         "usage_pro": 0.07605759799480438,
-        "zone_bangui": 0.2217557430267334,
+        "zone_urbain": 0.2217557430267334,
         "puissance_cv": 0.1284635215997696,
         "valeur_vehicule_fcfa": 0.21762031316757202,
         "nb_sinistres_anterieurs": 0.11423336714506149
