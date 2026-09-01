@@ -83,3 +83,85 @@ def test_habitation_simulate_endpoint_returns_one_point_per_value():
     # Prime croissante avec la valeur assurée
     premiums = [p["prime_commerciale"] for p in data["points"]]
     assert premiums == sorted(premiums)
+
+
+def test_habitation_policy_subscription_and_claim_flow(agent_headers):
+    payload = {
+        "customer": {
+            "first_name": "Aïcha",
+            "last_name": "Test",
+            "birth_date": "1985-02-15",
+            "gender": "F",
+            "city": "Bangui",
+        },
+        "property": {
+            "type_logement": "maison",
+            "zone": "urbain",
+            "surface_m2": 120,
+            "materiaux_construction": "semi_dur",
+            "valeur_batiment": 15_000_000,
+            "valeur_contenu": 3_000_000,
+            "anciennete_batiment": 15,
+            "securite": False,
+        },
+        "contract": BASE_HABITATION_CONTRACT,
+        "start_date": "2026-01-01",
+        "end_date": "2026-12-31",
+    }
+    with TestClient(app) as client:
+        policy_response = client.post("/habitation/policies", json=payload, headers=agent_headers)
+        assert policy_response.status_code == 200
+        policy = policy_response.json()
+        assert policy["premium"] > 0
+        assert policy["product"] == "HABITATION_MRH"
+        assert policy["property_id"] is not None
+        assert policy["vehicle_id"] is None
+        assert policy["pricing_result_id"] is not None
+
+        listed = client.get("/policies").json()
+        listed_policy = next(p for p in listed if p["id"] == policy["id"])
+        assert listed_policy["property_id"] == policy["property_id"]
+        # Régression : le contrôle réglementaire doit utiliser le bon
+        # produit (HABITATION_MRH), pas AUTO_RC en dur.
+        assert listed_policy["regulatory_check"]["compliant"] is True
+
+        claim_response = client.post(
+            "/claims",
+            json={
+                "policy_id": policy["id"],
+                "claim_date": "2026-04-01",
+                "claim_type": "incendie",
+                "claim_amount": 500_000,
+            },
+            headers=agent_headers,
+        )
+        assert claim_response.status_code == 200
+        assert claim_response.json()["policy_id"] == policy["id"]
+
+        # Le loss ratio habitation ne doit pas être pollué par les polices
+        # auto (voir docs/habitation.md) : le filtre ?product= isole la branche.
+        kpis_habitation = client.get("/portfolio/kpis?product=HABITATION_MRH").json()
+        assert kpis_habitation["nombre_polices"] >= 1
+        assert kpis_habitation["sinistres_totaux"] >= 500_000
+
+
+def test_habitation_policy_subscription_requires_authentication():
+    payload = {
+        "customer": {"first_name": "Anon", "last_name": "Test", "birth_date": "1985-02-15", "gender": "F"},
+        "property": {
+            "type_logement": "maison",
+            "zone": "urbain",
+            "surface_m2": 120,
+            "materiaux_construction": "dur",
+            "valeur_batiment": 10_000_000,
+            "valeur_contenu": 2_000_000,
+            "anciennete_batiment": 5,
+            "securite": True,
+        },
+        "contract": BASE_HABITATION_CONTRACT,
+        "start_date": "2026-01-01",
+        "end_date": "2026-12-31",
+    }
+    with TestClient(app) as client:
+        response = client.post("/habitation/policies", json=payload)
+    assert response.status_code == 401

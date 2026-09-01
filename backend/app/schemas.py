@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.regulatory.cima_countries import CimaCountryCode
 
@@ -11,6 +11,7 @@ Usage = Literal["particulier", "professionnel", "taxi_moto"]
 Zone = Literal["urbain", "rural"]
 Garantie = Literal["tiers_simple", "tiers_etendu", "tous_risques"]
 Gender = Literal["M", "F"]
+Role = Literal["admin", "agent", "viewer"]
 
 
 class ContractInput(BaseModel):
@@ -117,6 +118,45 @@ class BonusMalusResponse(BaseModel):
     avertissement: str
 
 
+# --- Authentification / RBAC (v0.6) -----------------------------------------
+# Voir docs/auth.md : trois rôles fixes (admin, agent, viewer). Le premier
+# compte créé via POST /auth/register devient automatiquement admin
+# (bootstrap) ; les suivants sont "agent" par défaut. Seul un admin peut
+# créer un compte avec un rôle choisi (POST /auth/users).
+
+
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=72, description="bcrypt tronque au-delà de 72 octets")
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserCreateByAdmin(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=72, description="bcrypt tronque au-delà de 72 octets")
+    role: Role = "agent"
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
 class CustomerInput(BaseModel):
     first_name: str
     last_name: str
@@ -149,7 +189,8 @@ class PolicySubscriptionRequest(BaseModel):
 class PolicyResponse(BaseModel):
     id: int
     customer_id: int
-    vehicle_id: int
+    vehicle_id: int | None = None
+    property_id: int | None = None
     product: str
     start_date: date
     end_date: date
@@ -256,3 +297,29 @@ class HabitationSimulationRequest(BaseModel):
 class HabitationSimulationResponse(BaseModel):
     parametre: str
     points: list[SimulationPoint]
+
+
+# --- Souscription/sinistres habitation (v0.6) --------------------------------
+# Même principe que l'auto (customer + actif assuré + contrat, voir
+# PolicySubscriptionRequest) : POST /habitation/policies persiste un
+# Property (pendant de Vehicle) plutôt qu'un Vehicle. Les sinistres
+# réutilisent ClaimInput/POST /claims tel quel, générique par police.
+
+
+class PropertyInput(BaseModel):
+    type_logement: TypeLogement = "maison"
+    zone: Zone = Field("urbain", description="Zone de la capitale/grande ville, ou zone rurale")
+    surface_m2: float = Field(..., gt=0, le=2000)
+    materiaux_construction: MateriauxConstruction = "dur"
+    valeur_batiment: float = Field(..., gt=0)
+    valeur_contenu: float = Field(..., ge=0)
+    anciennete_batiment: int = Field(..., ge=0, le=200)
+    securite: bool = False
+
+
+class HabitationPolicySubscriptionRequest(BaseModel):
+    customer: CustomerInput
+    property: PropertyInput
+    contract: HabitationContractInput
+    start_date: date
+    end_date: date

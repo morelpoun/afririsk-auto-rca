@@ -3,7 +3,7 @@ sinistres. Séparé de main.py pour garder les routes fines et testables.
 """
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import models
@@ -24,8 +24,22 @@ def create_vehicle(db: Session, customer_id: int, data: dict) -> models.Vehicle:
     return vehicle
 
 
-def create_policy(db: Session, customer_id: int, vehicle_id: int, data: dict) -> models.Policy:
-    policy = models.Policy(customer_id=customer_id, vehicle_id=vehicle_id, **data)
+def create_property(db: Session, customer_id: int, data: dict) -> models.Property:
+    property_row = models.Property(customer_id=customer_id, **data)
+    db.add(property_row)
+    db.flush()
+    return property_row
+
+
+def create_policy(
+    db: Session,
+    customer_id: int,
+    data: dict,
+    *,
+    vehicle_id: int | None = None,
+    property_id: int | None = None,
+) -> models.Policy:
+    policy = models.Policy(customer_id=customer_id, vehicle_id=vehicle_id, property_id=property_id, **data)
     db.add(policy)
     db.flush()
     return policy
@@ -108,7 +122,7 @@ def list_claims(db: Session, policy_id: int | None = None, limit: int = 50, offs
     return list(db.scalars(stmt))
 
 
-def portfolio_kpis(db: Session, country: str | None = None) -> dict:
+def portfolio_kpis(db: Session, country: str | None = None, product: str | None = None) -> dict:
     """Agrège les KPI de rentabilité.
 
     Sans `country`, agrège toutes les polices — dangereux si elles ne sont
@@ -117,10 +131,17 @@ def portfolio_kpis(db: Session, country: str | None = None) -> dict:
     `currencies` du résultat liste les devises effectivement incluses pour
     que l'appelant puisse détecter un mélange plutôt que de faire confiance
     silencieusement à un total agrégé.
+
+    Sans `product`, agrège aussi bien les polices auto qu'habitation
+    ensemble : un loss ratio mélangeant deux branches à la sinistralité très
+    différente est trompeur pour le pilotage préférer filtrer par produit
+    (voir `docs/habitation.md`).
     """
     stmt = select(models.Policy).options(joinedload(models.Policy.customer))
     if country is not None:
         stmt = stmt.join(models.Customer).where(models.Customer.country == country)
+    if product is not None:
+        stmt = stmt.where(models.Policy.product == product)
     policies = list(db.scalars(stmt).unique())
 
     nombre_polices = len(policies)
@@ -155,3 +176,18 @@ def portfolio_kpis(db: Session, country: str | None = None) -> dict:
         "combined_ratio": combined_ratio,
         "currencies": currencies,
     }
+
+
+def create_user(db: Session, email: str, hashed_password: str, role: str) -> models.User:
+    user = models.User(email=email, hashed_password=hashed_password, role=role)
+    db.add(user)
+    db.flush()
+    return user
+
+
+def get_user_by_email(db: Session, email: str) -> models.User | None:
+    return db.scalar(select(models.User).where(models.User.email == email))
+
+
+def count_users(db: Session) -> int:
+    return db.scalar(select(func.count()).select_from(models.User)) or 0

@@ -1,21 +1,34 @@
-# Souscription, sinistres et bonus-malus (v0.3)
+# Souscription, sinistres et bonus-malus (v0.6)
+
+## Authentification requise
+
+`POST /policies`, `POST /habitation/policies` et `POST /claims` nécessitent
+un compte `admin` ou `agent` (en-tête `Authorization: Bearer <token>`) depuis
+la v0.6 voir `docs/auth.md` pour créer un compte et obtenir un jeton. La
+lecture (`GET /policies`, `GET /claims`, `GET /portfolio/kpis`) reste
+publique pour l'instant (limitation documentée dans `docs/auth.md`).
 
 ## Parcours de souscription
 
-`POST /policies` prend un client, un véhicule et un contrat de tarification
-(le même format que `POST /tarif`), calcule la prime avec le moteur GLM, puis
-persiste dans l'ordre : `Customer` → `Vehicle` → `Policy` → `PricingResult`
-(avec `policy_id` renseigné, contrairement à une cotation `/tarif` isolée qui
-n'est rattachée à aucune police). C'est ce lien `PricingResult.policy_id` qui
-permet à `GET /portfolio/kpis` de retrouver les frais chargés à la
-souscription de chaque police.
+`POST /policies` (auto) prend un client, un véhicule et un contrat de
+tarification (le même format que `POST /tarif`), calcule la prime avec le
+moteur GLM, puis persiste dans l'ordre : `Customer` → `Vehicle` → `Policy` →
+`PricingResult` (avec `policy_id` renseigné, contrairement à une cotation
+`/tarif` isolée qui n'est rattachée à aucune police). `POST /habitation/policies`
+suit exactement le même principe pour la branche habitation, avec un
+`Property` (voir `docs/habitation.md`) à la place du véhicule. C'est le lien
+`PricingResult.policy_id` qui permet à `GET /portfolio/kpis` de retrouver les
+frais chargés à la souscription de chaque police, quelle que soit la branche.
 
-`GET /policies` liste les polices (pagination `limit`/`offset`).
+`GET /policies` liste les polices toutes branches confondues (pagination
+`limit`/`offset`) `vehicle_id` et `property_id` sont mutuellement exclusifs
+selon le produit (`product` : `AUTO_RC` ou `HABITATION_MRH`).
 
 ## Sinistres
 
-`POST /claims` déclare un sinistre sur une police existante (404 si
-`policy_id` n'existe pas). `GET /claims` liste les sinistres, filtrable par
+`POST /claims` déclare un sinistre sur une police existante, auto ou
+habitation (404 si `policy_id` n'existe pas) le schéma est générique,
+indépendant de la branche. `GET /claims` liste les sinistres, filtrable par
 `policy_id`. Le schéma (`database/models.Claim`) porte `claim_amount`,
 `paid_amount`, `reserved_amount` et `responsibility` séparément, mais ce MVP
 n'utilise pour l'instant que `claim_amount` dans les KPI — la distinction
@@ -43,6 +56,11 @@ devises sont à parité fixe avec l'EUR ; ce ne serait plus vrai avec le KMF
 (Comores). Le champ `currencies` de la réponse liste les devises réellement
 incluses : si plusieurs pays ont des polices, préférer filtrer avec
 `?country=CF` (ou tout autre code CIMA) pour un total dans une seule devise.
+
+**Attention au mélange de branches (depuis v0.6, habitation) :** de la même
+façon, sans `?product=`, l'agrégat mélange polices auto et habitation — deux
+sinistralités différentes, un loss ratio combiné n'a pas de sens pour le
+pilotage préférer `?product=AUTO_RC` ou `?product=HABITATION_MRH`.
 
 ## Peupler des données de démonstration
 

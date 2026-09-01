@@ -8,12 +8,13 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
+from app import auth
 from app.actuarial.bonus_malus import compute_bonus_malus
 from app.actuarial.data_simulation import generate_portfolio
 from app.actuarial.habitation_data_simulation import generate_habitation_portfolio
 from app.actuarial.habitation_pricing import HabitationActuarialEngine
 from app.actuarial.pricing import ActuarialEngine
-from app.database import crud
+from app.database import crud, models
 from app.database.session import get_db, init_db
 from app.regulatory.cima_countries import (
     CIMA_COUNTRIES,
@@ -32,9 +33,11 @@ from app.schemas import (
     ClaimResponse,
     ContractInput,
     HabitationContractInput,
+    HabitationPolicySubscriptionRequest,
     HabitationPricingResponse,
     HabitationSimulationRequest,
     HabitationSimulationResponse,
+    LoginRequest,
     PolicyResponse,
     PolicySubscriptionRequest,
     PortfolioKPIs,
@@ -44,6 +47,10 @@ from app.schemas import (
     SimulationPoint,
     SimulationRequest,
     SimulationResponse,
+    Token,
+    UserCreateByAdmin,
+    UserRegister,
+    UserResponse,
 )
 
 PORTFOLIO_SIZE = 15_000
@@ -83,7 +90,7 @@ app = FastAPI(
         "États membres de la CIMA, calibrée sur des portefeuilles synthétiques "
         "(voir docs/cahier_des_charges.md et docs/regulatory.md)."
     ),
-    version="0.5.0",
+    version="0.6.0",
     lifespan=lifespan,
 )
 
@@ -94,6 +101,56 @@ if FRONTEND_DIR.exists():
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/auth/register", response_model=Token)
+def register(payload: UserRegister, db: Session = Depends(get_db)) -> Token:
+    """Inscription publique. Le tout premier compte créé sur l'instance
+    devient automatiquement admin (bootstrap) ; les suivants sont "agent"
+    par défaut — voir docs/auth.md pour créer d'autres rôles ensuite.
+    """
+    if crud.get_user_by_email(db, payload.email) is not None:
+        raise HTTPException(status_code=400, detail="Un compte existe déjà avec cet email.")
+
+    role = "admin" if crud.count_users(db) == 0 else "agent"
+    user = crud.create_user(db, payload.email, auth.hash_password(payload.password), role)
+    db.commit()
+    db.refresh(user)
+    return Token(access_token=auth.create_access_token(user), user=UserResponse.model_validate(user))
+
+
+@app.post("/auth/login", response_model=Token)
+def login(payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
+    user = crud.get_user_by_email(db, payload.email)
+    if user is None or not auth.verify_password(payload.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Compte désactivé.")
+    return Token(access_token=auth.create_access_token(user), user=UserResponse.model_validate(user))
+
+
+@app.get("/auth/me", response_model=UserResponse)
+def me(user: models.User = Depends(auth.get_current_user)) -> UserResponse:
+    return UserResponse.model_validate(user)
+
+
+@app.post("/auth/users", response_model=UserResponse)
+def create_user_as_admin(
+    payload: UserCreateByAdmin,
+    db: Session = Depends(get_db),
+    _admin: models.User = Depends(auth.require_roles("admin")),
+) -> UserResponse:
+    """Réservé aux admins : seul moyen de créer un compte avec un rôle choisi
+    (y compris un autre admin ou un viewer) — POST /auth/register n'attribue
+    jamais "admin" au-delà du tout premier compte de l'instance.
+    """
+    if crud.get_user_by_email(db, payload.email) is not None:
+        raise HTTPException(status_code=400, detail="Un compte existe déjà avec cet email.")
+
+    user = crud.create_user(db, payload.email, auth.hash_password(payload.password), payload.role)
+    db.commit()
+    db.refresh(user)
+    return UserResponse.model_validate(user)
 
 
 @app.post("/tarif", response_model=PricingResponse)
@@ -237,10 +294,14 @@ def habitation_simulate(payload: HabitationSimulationRequest, request: Request) 
 
 @app.post("/policies", response_model=PolicyResponse)
 def subscribe_policy(
-    payload: PolicySubscriptionRequest, request: Request, db: Session = Depends(get_db)
+    payload: PolicySubscriptionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    _user: models.User = Depends(auth.require_roles("admin", "agent")),
 ) -> PolicyResponse:
     """Souscrit une police : calcule la prime avec le moteur actuariel, puis
     persiste client, véhicule, police et la cotation associée (traçabilité).
+    Réservé aux comptes admin/agent — voir docs/auth.md.
     """
     engine: ActuarialEngine = request.app.state.engine
     result = engine.price(payload.contract.model_dump())
@@ -251,7 +312,6 @@ def subscribe_policy(
     policy = crud.create_policy(
         db,
         customer.id,
-        vehicle.id,
         {
             "product": PRODUCT_AUTO,
             "start_date": payload.start_date,
@@ -261,6 +321,7 @@ def subscribe_policy(
             "premium": result.prime_commerciale,
             "status": "active",
         },
+        vehicle_id=vehicle.id,
     )
 
     pricing_row = crud.record_pricing_result(
@@ -284,6 +345,78 @@ def subscribe_policy(
         id=policy.id,
         customer_id=policy.customer_id,
         vehicle_id=policy.vehicle_id,
+        property_id=policy.property_id,
+        product=policy.product,
+        start_date=policy.start_date,
+        end_date=policy.end_date,
+        coverage=policy.coverage,
+        deductible=policy.deductible,
+        premium=policy.premium,
+        currency=currency_for_country(payload.contract.country),
+        status=policy.status,
+        pricing_result_id=pricing_row.id,
+        regulatory_check=RegulatoryCheck(
+            compliant=reg_check.compliant,
+            regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
+            message=reg_check.message,
+        ),
+    )
+
+
+@app.post("/habitation/policies", response_model=PolicyResponse)
+def subscribe_habitation_policy(
+    payload: HabitationPolicySubscriptionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    _user: models.User = Depends(auth.require_roles("admin", "agent")),
+) -> PolicyResponse:
+    """Souscrit une police habitation : même principe que POST /policies
+    (auto), moteur actuariel séparé, persiste un `Property` (pendant de
+    `Vehicle`) plutôt qu'un véhicule — voir docs/habitation.md.
+    """
+    engine: HabitationActuarialEngine = request.app.state.habitation_engine
+    result = engine.price(payload.contract.model_dump())
+    reg_check = check_minimum_tariff(payload.contract.country.value, PRODUCT_HABITATION, result.prime_commerciale)
+
+    customer = crud.create_customer(db, payload.customer.model_dump())
+    property_row = crud.create_property(db, customer.id, payload.property.model_dump())
+    policy = crud.create_policy(
+        db,
+        customer.id,
+        {
+            "product": PRODUCT_HABITATION,
+            "start_date": payload.start_date,
+            "end_date": payload.end_date,
+            "coverage": payload.contract.garantie,
+            "deductible": 0.0,
+            "premium": result.prime_commerciale,
+            "status": "active",
+        },
+        property_id=property_row.id,
+    )
+
+    pricing_row = crud.record_pricing_result(
+        db,
+        policy_id=policy.id,
+        model_version=HABITATION_MODEL_VERSION,
+        regulatory_version=reg_check.rule.regulatory_version if reg_check.rule else None,
+        input_data=payload.contract.model_dump(),
+        frequency=result.frequence_estimee,
+        severity=result.cout_moyen_estime,
+        pure_premium=result.prime_pure,
+        expenses=result.frais_gestion + result.marge_technique,
+        margin=result.marge_technique,
+        commercial_premium=result.prime_commerciale,
+    )
+    db.commit()
+    db.refresh(policy)
+    db.refresh(pricing_row)
+
+    return PolicyResponse(
+        id=policy.id,
+        customer_id=policy.customer_id,
+        vehicle_id=policy.vehicle_id,
+        property_id=policy.property_id,
         product=policy.product,
         start_date=policy.start_date,
         end_date=policy.end_date,
@@ -311,12 +444,13 @@ def get_policies(
     responses = []
     for p in policies:
         country = p.customer.country
-        reg_check = check_minimum_tariff(country, PRODUCT_AUTO, p.premium)
+        reg_check = check_minimum_tariff(country, p.product, p.premium)
         responses.append(
             PolicyResponse(
                 id=p.id,
                 customer_id=p.customer_id,
                 vehicle_id=p.vehicle_id,
+                property_id=p.property_id,
                 product=p.product,
                 start_date=p.start_date,
                 end_date=p.end_date,
@@ -337,7 +471,11 @@ def get_policies(
 
 
 @app.post("/claims", response_model=ClaimResponse)
-def declare_claim(payload: ClaimInput, db: Session = Depends(get_db)) -> ClaimResponse:
+def declare_claim(
+    payload: ClaimInput,
+    db: Session = Depends(get_db),
+    _user: models.User = Depends(auth.require_roles("admin", "agent")),
+) -> ClaimResponse:
     if crud.get_policy(db, payload.policy_id) is None:
         raise HTTPException(status_code=404, detail=f"Police {payload.policy_id} introuvable.")
 
@@ -408,6 +546,13 @@ def portfolio_kpis(
     country: CimaCountryCode | None = Query(
         None, description="Filtrer sur un pays — recommandé dès que plusieurs pays ont des polices, pour ne pas mélanger les devises."
     ),
+    product: str | None = Query(
+        None,
+        description=(
+            f"Filtrer sur un produit ({PRODUCT_AUTO} ou {PRODUCT_HABITATION}) — recommandé dès que "
+            "plusieurs branches ont des polices, un loss ratio mélangeant auto et habitation est trompeur."
+        ),
+    ),
     db: Session = Depends(get_db),
 ) -> PortfolioKPIs:
     """KPI de rentabilité (loss/expense/combined ratio) calculés sur les
@@ -420,4 +565,4 @@ def portfolio_kpis(
     de devises si `country` n'est pas précisé.
     """
     country_value = country.value if country else None
-    return PortfolioKPIs(**crud.portfolio_kpis(db, country=country_value))
+    return PortfolioKPIs(**crud.portfolio_kpis(db, country=country_value, product=product))

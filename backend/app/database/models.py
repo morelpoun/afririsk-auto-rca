@@ -23,6 +23,7 @@ class Customer(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     vehicles: Mapped[list["Vehicle"]] = relationship(back_populates="customer")
+    properties: Mapped[list["Property"]] = relationship(back_populates="customer")
     policies: Mapped[list["Policy"]] = relationship(back_populates="customer")
 
 
@@ -43,12 +44,35 @@ class Vehicle(Base):
     customer: Mapped["Customer"] = relationship(back_populates="vehicles")
 
 
+class Property(Base):
+    """Bien immobilier assuré (branche habitation) — pendant de `Vehicle` pour
+    l'auto : porte l'identité de l'actif, distincte des paramètres de risque
+    du contrat au moment de la tarification (`HabitationContractInput`).
+    """
+
+    __tablename__ = "properties"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"))
+    type_logement: Mapped[str] = mapped_column(String(20))
+    zone: Mapped[str] = mapped_column(String(10))
+    surface_m2: Mapped[float]
+    materiaux_construction: Mapped[str] = mapped_column(String(20))
+    valeur_batiment: Mapped[float]
+    valeur_contenu: Mapped[float]
+    anciennete_batiment: Mapped[int]
+    securite: Mapped[bool] = mapped_column(default=False)
+
+    customer: Mapped["Customer"] = relationship(back_populates="properties")
+
+
 class Policy(Base):
     __tablename__ = "policies"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"))
-    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
+    vehicle_id: Mapped[int | None] = mapped_column(ForeignKey("vehicles.id"), nullable=True)
+    property_id: Mapped[int | None] = mapped_column(ForeignKey("properties.id"), nullable=True)
     product: Mapped[str] = mapped_column(String(30), default="AUTO_RC")
     start_date: Mapped[date]
     end_date: Mapped[date]
@@ -75,6 +99,25 @@ class Claim(Base):
     status: Mapped[str] = mapped_column(String(20), default="open")
 
     policy: Mapped["Policy"] = relationship(back_populates="claims")
+
+
+class User(Base):
+    """Compte utilisateur (agent/admin) pour l'authentification et le RBAC.
+
+    Voir docs/auth.md : le premier compte créé via POST /auth/register
+    devient automatiquement "admin" (bootstrap), tous les suivants "agent"
+    par défaut ; seul un admin peut ensuite créer un compte avec un rôle
+    différent via POST /auth/users.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(20), default="agent")
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class PricingResult(Base):

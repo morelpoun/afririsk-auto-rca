@@ -15,8 +15,9 @@ hypothèses, feuille de route), [`docs/architecture.md`](docs/architecture.md),
 [`docs/regulatory.md`](docs/regulatory.md) (couche réglementaire CIMA),
 [`docs/ml_methodology.md`](docs/ml_methodology.md) (comparaison GLM / Tweedie
 / XGBoost+SHAP), [`docs/claims.md`](docs/claims.md) (souscription, sinistres,
-bonus-malus, KPI de rentabilité branche auto) et
-[`docs/habitation.md`](docs/habitation.md) (branche habitation).
+bonus-malus, KPI de rentabilité), [`docs/habitation.md`](docs/habitation.md)
+(branche habitation) et [`docs/auth.md`](docs/auth.md) (authentification,
+rôles).
 
 ## Démarrage rapide avec Docker (recommandé)
 
@@ -81,8 +82,10 @@ et renvoie la prime commerciale à chaque point (courbe de sensibilité).
 ## Branche habitation (MRH)
 
 `POST /habitation/tarif` et `POST /habitation/simulate` même principe que
-l'auto, moteur de tarification séparé (voir `docs/habitation.md`). Pas
-encore de souscription de police ni de sinistres pour cette branche.
+l'auto, moteur de tarification séparé (voir `docs/habitation.md`).
+`POST /habitation/policies` souscrit une police (authentification requise,
+voir plus bas) ; les sinistres et KPI réutilisent les mêmes endpoints que
+l'auto (`POST /claims`, `GET /portfolio/kpis?product=HABITATION_MRH`).
 
 ```bash
 curl -X POST http://localhost:8000/habitation/tarif \
@@ -102,11 +105,24 @@ curl -X POST http://localhost:8000/habitation/tarif \
   }'
 ```
 
+## Authentification et rôles
+
+`POST /auth/register` crée un compte (le tout premier de l'instance devient
+automatiquement `admin`, les suivants `agent`) ; `POST /auth/login` renvoie un
+jeton JWT (8h). Souscrire une police ou déclarer un sinistre nécessite un
+compte `admin`/`agent` (`Authorization: Bearer <token>`) — voir
+`docs/auth.md` pour le modèle de rôles et ses limites assumées (la lecture
+reste publique en v0.6). Interface : `http://localhost:8000/app/login.html`.
+
 ## Souscription, sinistres et bonus-malus
 
-`POST /policies` souscrit une police (client + véhicule + contrat tarifé) ;
-`POST /claims` déclare un sinistre ; `GET /portfolio/kpis` calcule loss ratio,
-expense ratio et combined ratio sur les données réellement persistées.
+`POST /policies` souscrit une police auto (client + véhicule + contrat
+tarifé), `POST /habitation/policies` fait de même pour l'habitation (client +
+bien assuré + contrat) — les deux nécessitent d'être authentifié.
+`POST /claims` déclare un sinistre sur n'importe quelle police, quelle que
+soit la branche. `GET /portfolio/kpis` calcule loss ratio, expense ratio et
+combined ratio sur les données réellement persistées, filtrable par
+`?country=` et `?product=` pour ne pas mélanger devises ou branches.
 `POST /bonus-malus/compute` calcule un coefficient à partir d'un historique de
 sinistres (grille par défaut, **non validée CIMA** — voir `docs/claims.md`).
 
@@ -160,9 +176,15 @@ cd backend && python -m pytest
 - ✅ Extension aux 15 pays CIMA réglementaire/devise par pays, modèle de
   risque encore partagé (v0.4, voir `docs/regulatory.md`)
 - ✅ Taxi-moto (auto) et branche habitation MRH moteur de tarification
-  complet, pas encore souscription/sinistres (v0.5, voir `docs/habitation.md`)
-- ⬜ Authentification/RBAC, frontend React/Next.js complet, facturation SaaS
-- ⬜ Calibration du risque par pays sur données réelles
+  complet (v0.5, voir `docs/habitation.md`)
+- ✅ Authentification JWT + RBAC (admin/agent/viewer), cycle de vie complet
+  habitation (souscription/sinistres), filtre `?product=` sur les KPI (v0.6,
+  voir `docs/auth.md` — lecture encore publique, limite assumée)
+- ⬜ Frontend React/Next.js complet (l'interface reste HTML/JS minimaliste),
+  facturation SaaS (prestataire de paiement à préciser)
+- ⬜ Calibration du risque par pays, tarifs minimums CIMA réels et grille
+  bonus-malus officielle sur données/textes réglementaires réels (aucune
+  donnée de ce type disponible dans ce projet — voir `docs/regulatory.md`)
 - ⬜ Santé et vie (paradigmes actuariels différents de l'habitation voir
   `docs/cahier_des_charges.md` §10)
 

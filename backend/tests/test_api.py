@@ -185,7 +185,7 @@ def test_bonus_malus_rejects_negative_claim_counts():
     assert response.status_code == 422
 
 
-def test_policy_subscription_and_claim_flow():
+def test_policy_subscription_and_claim_flow(agent_headers):
     payload = {
         "customer": {
             "first_name": "Jean",
@@ -208,7 +208,7 @@ def test_policy_subscription_and_claim_flow():
         "end_date": "2026-12-31",
     }
     with TestClient(app) as client:
-        policy_response = client.post("/policies", json=payload)
+        policy_response = client.post("/policies", json=payload, headers=agent_headers)
         assert policy_response.status_code == 200
         policy = policy_response.json()
         assert policy["premium"] > 0
@@ -229,6 +229,7 @@ def test_policy_subscription_and_claim_flow():
                 "claim_type": "materiel",
                 "claim_amount": 150_000,
             },
+            headers=agent_headers,
         )
         assert claim_response.status_code == 200
         claim = claim_response.json()
@@ -251,7 +252,7 @@ def test_policy_subscription_and_claim_flow():
         assert kpis_other_country["currencies"] == []
 
 
-def test_claim_on_unknown_policy_returns_404():
+def test_claim_on_unknown_policy_returns_404(agent_headers):
     with TestClient(app) as client:
         response = client.post(
             "/claims",
@@ -261,8 +262,57 @@ def test_claim_on_unknown_policy_returns_404():
                 "claim_type": "materiel",
                 "claim_amount": 100_000,
             },
+            headers=agent_headers,
         )
     assert response.status_code == 404
+
+
+def test_policy_subscription_requires_authentication():
+    payload = {
+        "customer": {
+            "first_name": "Anon",
+            "last_name": "Test",
+            "birth_date": "1990-05-10",
+            "gender": "M",
+        },
+        "vehicle": {
+            "year": 2019,
+            "vehicle_type": "berline",
+            "power": 8,
+            "market_value": 7_000_000,
+            "usage": "particulier",
+        },
+        "contract": BASE_CONTRACT,
+        "start_date": "2026-01-01",
+        "end_date": "2026-12-31",
+    }
+    with TestClient(app) as client:
+        response = client.post("/policies", json=payload)
+    assert response.status_code == 401
+
+
+def test_policy_subscription_rejects_viewer_role(viewer_headers):
+    payload = {
+        "customer": {
+            "first_name": "Viewer",
+            "last_name": "Test",
+            "birth_date": "1990-05-10",
+            "gender": "M",
+        },
+        "vehicle": {
+            "year": 2019,
+            "vehicle_type": "berline",
+            "power": 8,
+            "market_value": 7_000_000,
+            "usage": "particulier",
+        },
+        "contract": BASE_CONTRACT,
+        "start_date": "2026-01-01",
+        "end_date": "2026-12-31",
+    }
+    with TestClient(app) as client:
+        response = client.post("/policies", json=payload, headers=viewer_headers)
+    assert response.status_code == 403
 
 
 def test_simulate_endpoint_returns_one_point_per_value():

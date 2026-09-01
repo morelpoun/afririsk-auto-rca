@@ -1,4 +1,4 @@
-# Branche habitation (multirisque habitation / MRH) v0.5
+# Branche habitation (multirisque habitation / MRH) v0.6
 
 ## Périmètre
 
@@ -9,13 +9,19 @@ facteurs de risque habitation plutôt qu'automobile voir
 `backend/app/actuarial/habitation_pricing.py` et
 `habitation_data_simulation.py`.
 
-**v0.5 livre le moteur de tarification (`POST /habitation/tarif`,
-`POST /habitation/simulate`) mais pas encore le cycle de vie complet**
-(souscription de police, sinistres, KPI de rentabilité) que l'auto a depuis
-la v0.3 voir `docs/claims.md`. Étendre `POST /policies` à l'habitation est
-une extension naturelle mais non triviale (le schéma `PolicySubscriptionRequest`
-est aujourd'hui typé pour un contrat auto) : prévu comme prochain incrément
-si cette branche est utilisée.
+**Depuis v0.6, le cycle de vie est complet** : `POST /habitation/tarif` et
+`POST /habitation/simulate` pour la cotation (comme depuis la v0.5), et
+`POST /habitation/policies` pour la souscription — même principe que
+`POST /policies` pour l'auto (voir `docs/claims.md`), avec un `Property`
+(`database/models.Property`, pendant de `Vehicle`) plutôt qu'un véhicule.
+Les sinistres réutilisent `POST /claims` tel quel (générique par
+`policy_id`, indépendant de la branche). `GET /portfolio/kpis` agrège donc
+déjà les polices habitation avec les polices auto tant que
+`?country=` (ou une vraie séparation par produit) n'est pas ajouté pour les
+isoler — voir la limite ci-dessous.
+
+**Souscription protégée par authentification** (rôle `admin` ou `agent`,
+voir `docs/auth.md`) — comme la souscription auto.
 
 ## Variables d'entrée
 
@@ -70,3 +76,32 @@ curl -X POST http://localhost:8000/habitation/tarif \
     "garantie": "multirisque"
   }'
 ```
+
+## Souscription et sinistres
+
+```bash
+curl -X POST http://localhost:8000/habitation/policies \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer": {"first_name": "Aïcha", "last_name": "Doumbia", "birth_date": "1985-02-15", "gender": "F"},
+    "property": {
+      "type_logement": "maison", "zone": "urbain", "surface_m2": 120,
+      "materiaux_construction": "semi_dur", "valeur_batiment": 15000000,
+      "valeur_contenu": 3000000, "anciennete_batiment": 15, "securite": false
+    },
+    "contract": { "...": "même corps que POST /habitation/tarif" },
+    "start_date": "2026-01-01", "end_date": "2026-12-31"
+  }'
+```
+
+`POST /claims` (voir `docs/claims.md`) fonctionne tel quel pour un
+`policy_id` habitation, aucune adaptation nécessaire — le modèle `Claim` est
+générique par police.
+
+**Attention :** `GET /portfolio/kpis` agrège par défaut polices auto et
+habitation ensemble (elles partagent la même table `policies`). Un loss
+ratio mélangeant deux branches à la sinistralité très différente est
+trompeur pour le pilotage utiliser `?product=AUTO_RC` ou
+`?product=HABITATION_MRH` (ajouté en v0.6) dès qu'un vrai usage
+multi-branches apparaît, comme `?country=` pour les devises.

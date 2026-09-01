@@ -106,7 +106,6 @@ def seed(n: int, seed_value: int = 123) -> None:
             policy = crud.create_policy(
                 db,
                 customer.id,
-                vehicle.id,
                 {
                     "product": PRODUCT,
                     "start_date": start_date,
@@ -116,6 +115,7 @@ def seed(n: int, seed_value: int = 123) -> None:
                     "premium": result.prime_commerciale,
                     "status": "active",
                 },
+                vehicle_id=vehicle.id,
             )
 
             crud.record_pricing_result(
