@@ -105,11 +105,11 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
 8. ⬜ Partenariat avec une compagnie RCA pour données réelles anonymisées et
    recalibration des modèles
 9. ✅ Extension sous-régionale aux 15 pays CIMA (v0.4, voir `docs/regulatory.md`)
-   — réglementaire et devise par pays ; modèle de risque encore partagé,
+   réglementaire et devise par pays ; modèle de risque encore partagé,
    calibration par pays hors périmètre tant que des données réelles ne sont
    pas disponibles
 10. ⬜ Authentification/RBAC, frontend React/Next.js complet, facturation SaaS
-11. 🟡 Extension multi-branches (v0.5, voir `docs/habitation.md`) — habitation
+11. 🟡 Extension multi-branches (v0.5, voir `docs/habitation.md`) habitation
     (MRH) livrée avec moteur de tarification complet (fréquence×sévérité,
     explicabilité) et taxi-moto ajouté à la branche auto ; souscription/
     sinistres/KPI habitation, santé et vie restent à faire (§10 explique
