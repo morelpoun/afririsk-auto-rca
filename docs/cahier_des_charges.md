@@ -1,4 +1,4 @@
-# Cahier des charges — "AfriRisk" (tarification multi-branches CIMA)
+# Cahier des charges "AfriRisk" (tarification multi-branches CIMA)
 
 ## 1. Objectif
 Fournir un outil permettant à un assureur ou courtier des 15 États membres de
@@ -10,7 +10,7 @@ calculées par un moteur actuariel transparent et explicable.
 
 **Dans le périmètre :**
 - Deux branches : assurance automobile particulière (y compris taxi-moto) et
-  multirisque habitation (MRH) — voir `docs/habitation.md`. Auto a le cycle
+  multirisque habitation (MRH) voir `docs/habitation.md`. Auto a le cycle
   de vie complet (souscription, sinistres, KPI) ; habitation n'a pour
   l'instant que le moteur de tarification (`POST /habitation/tarif`)
 - Les 15 États membres de la CIMA, avec **un seul modèle de risque partagé
@@ -73,7 +73,7 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
 - Backend : Python + FastAPI, structuré en sous-modules `actuarial/`
   (fréquence/sévérité/prime/bonus-malus), `regulatory/` (règles CIMA
   configurables par pays), `database/` (persistance + CRUD polices/sinistres)
-  et `ml/` (benchmarks Tweedie/XGBoost, hors production — voir §6 v0.2)
+  et `ml/` (benchmarks Tweedie/XGBoost, hors production voir §6 v0.2)
 - Moteur actuariel : pandas, numpy, statsmodels (GLM Poisson / Gamma)
 - Persistance : PostgreSQL via `docker-compose` (SQLite en développement/tests
   sans configuration). Chaque tarification est tracée dans `pricing_results`
