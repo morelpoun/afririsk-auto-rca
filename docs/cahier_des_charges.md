@@ -14,7 +14,7 @@ calculées par un moteur actuariel transparent et explicable.
   de vie complet (souscription, sinistres, KPI) ; habitation n'a pour
   l'instant que le moteur de tarification (`POST /habitation/tarif`)
 - Les 15 États membres de la CIMA, avec **un seul modèle de risque partagé
-  par branche** (voir `docs/regulatory.md`) — seuls la devise et le contrôle
+  par branche** (voir `docs/regulatory.md`) seuls la devise et le contrôle
   réglementaire varient par pays, pas encore le risque lui-même faute de
   données réelles par marché
 - Pour l'auto : calcul de prime à la souscription, souscription de polices,
@@ -23,7 +23,7 @@ calculées par un moteur actuariel transparent et explicable.
 - Données simulées, calibrées sur des hypothèses de marché documentées et ajustables
 
 **Hors périmètre (phases suivantes) :**
-- Santé et vie — voir §10 pour pourquoi elles ne sont pas traitées comme
+- Santé et vie (voir §10) pour pourquoi elles ne sont pas traitées comme
   l'habitation (paradigmes actuariels différents)
 - Cycle de vie complet (souscription/sinistres/KPI) pour l'habitation
 - Calibration du risque par pays sur données réelles (voir `docs/regulatory.md`)
@@ -95,11 +95,11 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
 4. ✅ Couche réglementaire configurable (CIMA/RCA)
 5. ✅ Interface de tarification et dashboard minimalistes
 6. ✅ Modèles Tweedie / XGBoost + SHAP, comparaison de modèles (v0.2, voir
-   `docs/ml_methodology.md`) — le GLM fréquence×sévérité reste le modèle de
+   `docs/ml_methodology.md`) le GLM fréquence×sévérité reste le modèle de
    production ; les alternatives sont des benchmarks, pas encore justifiées
    par un gain net sur données réelles
 7. ✅ Bonus-malus, gestion des sinistres, KPI de rentabilité (v0.3, voir
-   `docs/claims.md`) — grille bonus-malus par défaut non validée CIMA,
+   `docs/claims.md`) grille bonus-malus par défaut non validée CIMA,
    souscription de polices (`POST /policies`), sinistres (`POST /claims`),
    loss/expense/combined ratio (`GET /portfolio/kpis`)
 8. ⬜ Partenariat avec une compagnie RCA pour données réelles anonymisées et
@@ -122,7 +122,7 @@ sévérité, modélisée par GLM Poisson/Gamma sur des facteurs de risque
 observables à la souscription. Santé et vie sont différentes :
 
 - **Vie** repose sur des **tables de mortalité/survie**, pas sur une
-  fréquence de sinistre au sens habituel — il s'agit de modéliser la
+  fréquence de sinistre au sens habituel il s'agit de modéliser la
   probabilité de décès par âge et d'actualiser des flux futurs (valeur
   actuelle probable des prestations), un outillage mathématique distinct
   (tables actuarielles, taux technique, provisions mathématiques) qui
@@ -132,14 +132,14 @@ observables à la souscription. Santé et vie sont différentes :
   mais soulève des enjeux supplémentaires : données médicales (sensibilité
   et réglementation sur les données de santé), réseaux de soins et tarifs
   conventionnés propres à chaque pays, sélection adverse et anti-sélection à
-  gérer explicitement — un périmètre qui mérite d'être cadré avant de coder,
+  gérer explicitement un périmètre qui mérite d'être cadré avant de coder,
   pas improvisé dans le même mouvement que l'habitation.
 
 Ces deux branches restent donc de futurs incréments séparés, chacun avec sa
 propre conception, plutôt que des variantes rapides du moteur auto/habitation.
 
 ## 11. Risques principaux
-- Sans données réelles, le modèle reste démonstratif — une mise en production
+- Sans données réelles, le modèle reste démonstratif une mise en production
   nécessite une calibration sur les données d'une vraie compagnie
 - Le même modèle de risque est utilisé pour les 15 pays CIMA (voir
   `docs/regulatory.md`) : ne jamais présenter une prime calculée hors RCA
