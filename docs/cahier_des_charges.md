@@ -113,7 +113,7 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
     (MRH) livrée avec moteur de tarification complet (fréquence×sévérité,
     explicabilité) et taxi-moto ajouté à la branche auto ; souscription/
     sinistres/KPI habitation, santé et vie restent à faire (§10 explique
-    pourquoi santé et vie ne sont pas traitées de la même manière)
+    pourquoi santé et vie ne sont pas traitées de la même manière) 
 
 ## 10. Pourquoi santé et vie ne sont pas traitées comme l'habitation
 L'habitation a pu être ajoutée comme un second incrément direct de l'auto
