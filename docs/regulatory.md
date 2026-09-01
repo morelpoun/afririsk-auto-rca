@@ -1,4 +1,4 @@
-# Réglementaire — espace CIMA (15 États membres)
+# Réglementaire : espace CIMA (15 États membres)
 
 ## Pourquoi une couche séparée
 
