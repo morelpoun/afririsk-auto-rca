@@ -12,7 +12,7 @@ facteurs de risque habitation plutôt qu'automobile — voir
 **v0.5 livre le moteur de tarification (`POST /habitation/tarif`,
 `POST /habitation/simulate`) mais pas encore le cycle de vie complet**
 (souscription de police, sinistres, KPI de rentabilité) que l'auto a depuis
-la v0.3 — voir `docs/claims.md`. Étendre `POST /policies` à l'habitation est
+la v0.3 voir `docs/claims.md`. Étendre `POST /policies` à l'habitation est
 une extension naturelle mais non triviale (le schéma `PolicySubscriptionRequest`
 est aujourd'hui typé pour un contrat auto) : prévu comme prochain incrément
 si cette branche est utilisée.
@@ -34,7 +34,7 @@ si cette branche est utilisée.
 
 Comme pour l'auto, ces hypothèses sont documentées dans le code
 (`habitation_data_simulation.py`) et partagées par tous les pays CIMA faute
-de données réelles par pays — même avertissement que `docs/regulatory.md`.
+de données réelles par pays même avertissement que `docs/regulatory.md`.
 
 - Construction précaire : risque incendie/effondrement nettement plus élevé
   (+90 % de fréquence), mais coût de reconstruction par sinistre plus faible
