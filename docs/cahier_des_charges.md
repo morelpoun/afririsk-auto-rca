@@ -80,12 +80,12 @@ de départ démonstratifs, à recalibrer sur données réelles en phase 4.
   (entrées, modèle, version réglementaire) pour pouvoir reconstruire un calcul
   passé — voir `docs/architecture.md`
 - Réglementaire : couche `regulatory/` configurable par (pays, produit), voir
-  `docs/regulatory.md` — table des 15 pays CIMA (`cima_countries.py`), tarif
+  `docs/regulatory.md` table des 15 pays CIMA (`cima_countries.py`), tarif
   minimum non codé en dur tant qu'il n'a pas été obtenu et validé auprès du
   régulateur, pour aucun pays
 - Frontend : interface statique minimale (`frontend/index.html` formulaire de
   cotation, `frontend/dashboard.html` KPI portefeuille), servie par FastAPI en
-  HTML/JS vanilla — un frontend React/Next.js plus riche reste une évolution
+  HTML/JS vanilla un frontend React/Next.js plus riche reste une évolution
   possible, pas un prérequis du MVP
 
 ## 8. Jalons
