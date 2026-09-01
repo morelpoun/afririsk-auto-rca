@@ -38,7 +38,7 @@ Renvoie `None` pour les trois ratios tant qu'aucune police n'a été souscrite
 
 **Attention aux devises (depuis v0.4, multi-pays) :** sans le paramètre
 `?country=`, l'agrégat porte sur toutes les polices, quel que soit leur pays
-— additionner des primes en XAF et en XOF n'a de sens que parce que ces deux
+additionner des primes en XAF et en XOF n'a de sens que parce que ces deux
 devises sont à parité fixe avec l'EUR ; ce ne serait plus vrai avec le KMF
 (Comores). Le champ `currencies` de la réponse liste les devises réellement
 incluses : si plusieurs pays ont des polices, préférer filtrer avec
@@ -64,12 +64,12 @@ par année (`[0, 1, 0, 0]`, du plus ancien au plus récent) et renvoie un
 coefficient (borné entre 0,50 et 3,50) et une classe indicative. La grille
 appliquée (`backend/app/actuarial/bonus_malus.py`) est une **grille par
 défaut générique** (−5 %/an sans sinistre, +25 %/sinistre responsable),
-**pas** la grille réglementaire CIMA validée pour la RCA — chaque réponse le
+**pas** la grille réglementaire CIMA validée pour la RCA chaque réponse le
 rappelle explicitement dans son champ `avertissement`.
 
 Le coefficient obtenu se transmet ensuite tel quel dans le champ
 `coefficient_bonus_malus` de `ContractInput` (défaut `1.0`), multiplié à la
 prime pure comme le chargement de garantie. Le calcul du coefficient et son
 application à la tarification sont donc deux étapes séparées et explicites,
-jamais automatiques — cohérent avec la couche réglementaire (`regulatory/`)
+jamais automatiques cohérent avec la couche réglementaire (`regulatory/`)
 qui suit le même principe de ne rien appliquer sans une valeur validée.
