@@ -19,7 +19,7 @@ Tweedie, sur le **même** jeu de test.
 Cible commune : prime pure observée (coût total réel de la police divisé par
 son exposition, 0 si aucun sinistre). Split train/test 70/30, mêmes données
 pour les trois modèles.
-
+  
 ## Métriques
 
 - **RMSE / MAE** : erreur de prédiction sur la prime pure
