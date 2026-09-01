@@ -3,8 +3,8 @@
 Moteur de tarification actuarielle pour l'assurance automobile particulière en
 République Centrafricaine, espace CIMA. L'API calcule une prime pure et une
 prime commerciale à partir des caractéristiques d'un contrat, avec des modèles
-de fréquence (GLM Poisson) et de sévérité (GLM Gamma) calibrés — pour
-l'instant — sur un portefeuille synthétique documenté, une couche
+de fréquence (GLM Poisson) et de sévérité (GLM Gamma) calibrés pour
+l'instant sur un portefeuille synthétique documenté, une couche
 réglementaire configurable par pays, et une traçabilité complète de chaque
 cotation.
 
